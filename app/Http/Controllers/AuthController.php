@@ -2,29 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\RegisterRequest;
-use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Services\AuthService;
 
 class AuthController extends Controller
 {
+
+    protected AuthService $authService;
+
+    function __construct(AuthService $authService)
+    {
+        $this->authService = $authService;
+    }
+
     function register(RegisterRequest $request)
     {
-        $validated = $request->validate();
+        $validatedData = $request->validated();
 
-        $hashedPassword = Hash::make($validated['password']);
+        $result = $this->authService->register($validatedData);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $hashedPassword,
-        ]);
-
-        $token = $user->createToken('react-client')->plainTextToken;
-
-        return response()->json([
-            'user' => $user,
-            'access_token' => $token,
-        ], 201);
+        return response()->json($result, 201);
     }
 }
