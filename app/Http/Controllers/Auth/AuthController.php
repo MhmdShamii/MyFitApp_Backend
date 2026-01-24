@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Requests\Auth\LoginRequest;
 use App\Services\Auth\AuthService;
 
 class AuthController extends Controller
@@ -29,10 +30,20 @@ class AuthController extends Controller
             'token' => $result['token'],
         ], 201);
     }
-    function login()
+    function login(LoginRequest $loginRequest)
     {
-        // login logic
+        // 1. Get validated data
+        $data = $loginRequest->validated();
+
+        $result = $this->authService->login($data);
+
+        // 3. Return response
+        return response()->json([
+            'user'  => $result['user'],
+            'token' => $result['token'],
+        ], 200);
     }
+
     function me()
     {
         // profile logic

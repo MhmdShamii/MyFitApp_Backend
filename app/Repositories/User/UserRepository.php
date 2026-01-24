@@ -18,5 +18,10 @@ class UserRepository
         return $this->model->create($data);
     }
 
+    function findByEmail(string $email): ?User
+    {
+        return $this->model->where('email', $email)->first();
+    }
+
     // register-related methods will go here
 }

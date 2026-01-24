@@ -32,5 +32,29 @@ class AuthService
         ];
     }
 
-    // register / login / logout logic will go here
+    function login(array $data): array
+    {
+        //get user by email
+        $user = $this->userRepository->findByEmail($data['email']);
+
+        //check if user exists and password is correct by matchng hashed password
+        if (!$user || !Hash::check($data['password'], $user->password)) {
+            return [
+                'error' => 'Invalid credentials',
+            ];
+        }
+
+        //create token
+        $token = $user->createToken('web')->plainTextToken;
+
+        //return response
+        return [
+            'user' => $user,
+            'token' => $token,
+        ];
+    }
+
+    //me
+
+    //logout
 }
