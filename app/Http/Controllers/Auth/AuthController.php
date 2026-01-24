@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Services\Auth\AuthService;
+use Illuminate\Container\Attributes\Auth;
+use Symfony\Component\HttpFoundation\Request;
 
 class AuthController extends Controller
 {
@@ -37,6 +39,12 @@ class AuthController extends Controller
 
         $result = $this->authService->login($data);
 
+        if (isset($result['error'])) {
+            return response()->json([
+                'error' => $result['error'],
+            ], 401);
+        }
+
         // 3. Return response
         return response()->json([
             'user'  => $result['user'],
@@ -44,12 +52,16 @@ class AuthController extends Controller
         ], 200);
     }
 
-    function me()
+    function me(Request $request)
     {
-        // profile logic
+
+        return response()->json($request->user(), 200);
     }
-    function logout()
+
+    function logout(Request $request)
     {
         // logout logic
+        $this->authService->logout($request->user());
+        return response()->json(['message' => 'Logged out successfully'], 200);
     }
 }

@@ -22,6 +22,4 @@ class UserRepository
     {
         return $this->model->where('email', $email)->first();
     }
-
-    // register-related methods will go here
 }

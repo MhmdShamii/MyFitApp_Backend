@@ -53,8 +53,9 @@ class AuthService
             'token' => $token,
         ];
     }
-
-    //me
-
     //logout
+    function logout($user)
+    {
+        $user->tokens()->delete();
+    }
 }
