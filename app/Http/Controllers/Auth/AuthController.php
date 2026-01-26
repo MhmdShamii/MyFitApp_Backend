@@ -7,8 +7,8 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Http\Responses\ApiResponse;
-use App\Models\User;
 use App\Services\Auth\AuthService;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
@@ -66,7 +66,7 @@ class AuthController extends Controller
 
     //======== Helper Functions =========//
 
-    private function authResponseData(User $user, string $token): array
+    protected function authResponseData(User $user, string $token): array
     {
         return [
             'user'  => new UserResource($user),
