@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Services\Auth\AuthService;
-use Illuminate\Container\Attributes\Auth;
 use Illuminate\Validation\UnauthorizedException;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -19,7 +18,7 @@ class AuthController extends Controller
         $this->authService = $authService;
     }
 
-    function register(RegisterRequest $registerRequest)
+    public function register(RegisterRequest $registerRequest)
     {
         $data = $registerRequest->validated();
         $result = $this->authService->register($data);
@@ -30,7 +29,7 @@ class AuthController extends Controller
         ], 201);
     }
 
-    function login(LoginRequest $loginRequest)
+    public function login(LoginRequest $loginRequest)
     {
         try {
             $result = $this->authService->login($loginRequest->validated());
@@ -46,9 +45,15 @@ class AuthController extends Controller
         }
     }
 
-    function logout(Request $request)
+    public function logout(Request $request)
     {
         $this->authService->logout($request->user());
         return response()->json(['message' => 'Logged out successfully'], 200);
+    }
+
+    public function logoutFromAllDevices(Request $request)
+    {
+        $this->authService->logoutFromAllDevices($request->user());
+        return response()->json(['message' => 'Logged out from all devices successfully'], 200);
     }
 }

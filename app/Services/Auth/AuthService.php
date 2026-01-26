@@ -33,6 +33,11 @@ class AuthService
 
     public function logout($user): void
     {
+        $user->currentAccessToken()?->delete();
+    }
+
+    public function logoutFromAllDevices($user): void
+    {
         $user->tokens()->delete();
     }
 
