@@ -21,12 +21,9 @@ class AuthController extends Controller
 
     function register(RegisterRequest $registerRequest)
     {
-        // 1. Get validated data
         $data = $registerRequest->validated();
-
         $result = $this->authService->register($data);
 
-        // 3. Return response
         return response()->json([
             'user'  => $result['user'],
             'token' => $result['token'],
@@ -34,9 +31,7 @@ class AuthController extends Controller
     }
     function login(LoginRequest $loginRequest)
     {
-        // 1. Get validated data
         $data = $loginRequest->validated();
-
         $result = $this->authService->login($data);
 
         if (isset($result['error'])) {
@@ -45,7 +40,6 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // 3. Return response
         return response()->json([
             'user'  => $result['user'],
             'token' => $result['token'],
@@ -60,7 +54,6 @@ class AuthController extends Controller
 
     function logout(Request $request)
     {
-        // logout logic
         $this->authService->logout($request->user());
         return response()->json(['message' => 'Logged out successfully'], 200);
     }
