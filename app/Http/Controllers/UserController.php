@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Responses\ApiResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    public function me(Request $request)
+    use ApiResponse;
+
+    public function me(Request $request): JsonResponse
     {
-        return response()->json($request->user(), 200);
+        return $this->success(['user' => $request->user()], 'User retrieved successfully');
     }
 }
