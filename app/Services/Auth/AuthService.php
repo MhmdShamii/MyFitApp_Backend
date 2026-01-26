@@ -31,12 +31,12 @@ class AuthService
         });
     }
 
-    public function logout($user): void
+    public function logout(User $user): void
     {
         $user->currentAccessToken()?->delete();
     }
 
-    public function logoutFromAllDevices($user): void
+    public function logoutFromAllDevices(User $user): void
     {
         $user->tokens()->delete();
     }
@@ -65,7 +65,7 @@ class AuthService
         return $user;
     }
 
-    private function isValidUser($user, $password): bool
+    private function isValidUser(?User $user, string $password): bool
     {
         return $user && Hash::check($password, $user->password);
     }

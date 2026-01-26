@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Services\Auth\AuthService;
-use Illuminate\Validation\UnauthorizedException;
-use Symfony\Component\HttpFoundation\Request;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 class AuthController extends Controller
 {
@@ -38,9 +38,9 @@ class AuthController extends Controller
                 'user'  => $result['user'],
                 'token' => $result['token'],
             ], 200);
-        } catch (UnauthorizedException $e) {
+        } catch (UnauthorizedHttpException $e) {
             return response()->json([
-                'error'  => $e->getMessage(),
+                'message'  => $e->getMessage(),
             ], 401);
         }
     }
