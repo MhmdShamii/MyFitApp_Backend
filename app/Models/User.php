@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+
+use GuzzleHttp\Psr7\Query;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -51,8 +53,8 @@ class User extends Authenticatable
         ];
     }
 
-    function scopeFindByEmail($querry, $email)
+    public function scopeFindByEmail($query, string $email): ?User
     {
-        return $querry->where('email', $email)->first();
+        return $query->where('email', $email)->first();
     }
 }
