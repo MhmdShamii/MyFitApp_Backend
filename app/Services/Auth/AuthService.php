@@ -22,13 +22,13 @@ class AuthService
     {
         $user = User::findByEmail($data['email'])->first();
 
-        if (!$user || !Hash::check($data['password'], $user->password)) {
+        if (!$this->isValidUser($user, $data['password'])) {
             return [
                 'error' => 'Invalid credentials',
             ];
         }
-
         $token = $user->createToken('web')->plainTextToken;
+
         return [
             'user' => $user,
             'token' => $token,
@@ -37,5 +37,10 @@ class AuthService
     function logout($user)
     {
         $user->tokens()->delete();
+    }
+
+    private function isValidUser($user, $password): bool
+    {
+        return $user && Hash::check($password, $user->password);
     }
 }
