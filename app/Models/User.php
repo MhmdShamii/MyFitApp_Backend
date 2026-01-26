@@ -50,4 +50,9 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    function scopeFindByEmail($querry, $email)
+    {
+        return $querry->where('email', $email)->first();
+    }
 }
