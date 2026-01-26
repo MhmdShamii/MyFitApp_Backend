@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Services\Auth\AuthService;
 use Illuminate\Container\Attributes\Auth;
+use Illuminate\Validation\UnauthorizedException;
 use Symfony\Component\HttpFoundation\Request;
 
 class AuthController extends Controller
@@ -18,7 +19,6 @@ class AuthController extends Controller
         $this->authService = $authService;
     }
 
-
     function register(RegisterRequest $registerRequest)
     {
         $data = $registerRequest->validated();
@@ -29,21 +29,21 @@ class AuthController extends Controller
             'token' => $result['token'],
         ], 201);
     }
+
     function login(LoginRequest $loginRequest)
     {
-        $data = $loginRequest->validated();
-        $result = $this->authService->login($data);
+        try {
+            $result = $this->authService->login($loginRequest->validated());
 
-        if (isset($result['error'])) {
             return response()->json([
-                'error' => $result['error'],
+                'user'  => $result['user'],
+                'token' => $result['token'],
+            ], 200);
+        } catch (UnauthorizedException $e) {
+            return response()->json([
+                'error'  => $e->getMessage(),
             ], 401);
         }
-
-        return response()->json([
-            'user'  => $result['user'],
-            'token' => $result['token'],
-        ], 200);
     }
 
     function me(Request $request)

@@ -4,6 +4,7 @@ namespace App\Services\Auth;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\UnauthorizedException;
 
 class AuthService
 {
@@ -23,10 +24,9 @@ class AuthService
         $user = User::findByEmail($data['email'])->first();
 
         if (!$this->isValidUser($user, $data['password'])) {
-            return [
-                'error' => 'Invalid credentials',
-            ];
+            throw new UnauthorizedException('Invalid credentials');
         }
+
         $token = $user->createToken('web')->plainTextToken;
 
         return [
