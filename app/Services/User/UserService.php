@@ -14,6 +14,18 @@ use Illuminate\Support\Str;
 class UserService
 {
 
+    public function updateRole(User $user, string $role, User $admin): User
+    {
+        if ($user->id === $admin->id) {
+            abort(422, 'You cannot change your own role.');
+        }
+
+        $user->role = $role;
+        $user->save();
+
+        return $user->fresh();
+    }
+
     public function getUsers(?string $search, ?string $role, ?string $onboardingStep, int $perPage = 20): CursorPaginator
     {
         return User::query()
