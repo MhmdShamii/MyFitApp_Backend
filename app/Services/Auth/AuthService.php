@@ -6,6 +6,7 @@ use App\Enums\UserProvider;
 use App\Jobs\SendVerificationEmailJob;
 use App\Models\User;
 use App\Models\UserProfile;
+use App\Services\Analytics\PlatformStatsService;
 use Google_Client;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,8 @@ use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 class AuthService
 {
+    public function __construct(private PlatformStatsService $platformStatsService) {}
+
     public function register(array $data): array
     {
         return DB::transaction(function () use ($data) {
@@ -219,6 +222,7 @@ class AuthService
     {
         $user = User::forceCreate($attributes);
         UserProfile::create(['user_id' => $user->id]);
+        $this->platformStatsService->incrementNewUsers();
         return $user;
     }
 

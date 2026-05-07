@@ -108,6 +108,26 @@ class NotificationService
         ]);
     }
 
+    public function notifyApplicationApproved(User $admin, User $applicant): void
+    {
+        Notification::create([
+            'user_id'  => $applicant->id,
+            'actor_id' => $admin->id,
+            'type'     => NotificationType::COACH_APPLICATION_APPROVED,
+            'data'     => [],
+        ]);
+    }
+
+    public function notifyApplicationRejected(User $admin, User $applicant, string $reason): void
+    {
+        Notification::create([
+            'user_id'  => $applicant->id,
+            'actor_id' => $admin->id,
+            'type'     => NotificationType::COACH_APPLICATION_REJECTED,
+            'data'     => ['reason' => $reason],
+        ]);
+    }
+
     public function notifyFollow(User $actor, User $target): void
     {
         if ($actor->id === $target->id) {

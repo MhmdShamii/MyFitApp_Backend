@@ -8,6 +8,7 @@ use App\Models\DailySummary;
 use App\Models\MealMacro;
 use App\Models\MealPost;
 use App\Models\User;
+use App\Services\Analytics\PlatformStatsService;
 use App\Services\Notification\NotificationService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,7 @@ class DailyLogingService
     public function __construct(
         private CalculateMacrosService $macrosService,
         private NotificationService $notificationService,
+        private PlatformStatsService $platformStatsService,
     ) {}
 
     public function logMealFromPost(MealPost $mealPost, User $user): DailyLog
@@ -35,8 +37,10 @@ class DailyLogingService
 
     public function removeLogFromDailySummary(DailyLog $log): void
     {
-        DB::transaction(function () use ($log) {
-            if ($log->confirmed_at !== null) {
+        $wasConfirmed = $log->confirmed_at !== null;
+
+        DB::transaction(function () use ($log, $wasConfirmed) {
+            if ($wasConfirmed) {
                 $summary = $log->dailySummary;
                 if ($summary) {
                     $this->modifyDailySummary($summary, $log, isAdding: false);
@@ -49,6 +53,10 @@ class DailyLogingService
 
             $log->delete();
         });
+
+        if ($wasConfirmed) {
+            $this->platformStatsService->decrementMealsLogged();
+        }
     }
 
     public function logCustomMeal(User $user, array $validatedData): DailyLog
@@ -89,6 +97,8 @@ class DailyLogingService
             $log->update(['confirmed_at' => now()]);
 
             $this->modifyDailySummary($log->dailySummary, $log, isAdding: true);
+
+            $this->platformStatsService->incrementMealsLogged();
 
             return $log;
         });
@@ -158,6 +168,7 @@ class DailyLogingService
         ]);
 
         $this->modifyDailySummary($summary, $log, isAdding: true);
+        $this->platformStatsService->incrementMealsLogged();
 
         return $log;
     }

@@ -22,6 +22,7 @@ class UserPublicProfileResource extends JsonResource
                 'avatar'      => $this->resolveAvatarUrl(),
                 'cover_image' => $this->resolveCoverImageUrl(),
             ],
+            'role'            => $this->role,
             'followers_count' => $this->followers_count ?? 0,
             'following_count' => $this->following_count ?? 0,
             'is_following'    => (bool) $this->is_following,

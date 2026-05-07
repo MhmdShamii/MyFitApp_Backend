@@ -25,6 +25,7 @@ class FeedPostResource extends JsonResource
                 'first_name'   => $author?->first_name,
                 'last_name'    => $author?->last_name,
                 'avatar'       => $this->resolveAvatarUrl($author?->image),
+                'role'         => $author?->role,
                 'is_following' => (bool) $this->viewer_follows_author,
             ],
 

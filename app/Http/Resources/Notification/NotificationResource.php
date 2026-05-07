@@ -19,6 +19,7 @@ class NotificationResource extends JsonResource
                 'first_name' => $this->actor->first_name,
                 'last_name'  => $this->actor->last_name,
                 'avatar'     => $this->resolveAvatarUrl($this->actor->image),
+                'role'       => $this->actor->role,
             ],
             'created_at' => $this->created_at->toISOString(),
         ];

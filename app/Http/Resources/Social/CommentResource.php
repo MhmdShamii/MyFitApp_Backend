@@ -19,6 +19,7 @@ class CommentResource extends JsonResource
                 'first_name' => $this->user->first_name,
                 'last_name'  => $this->user->last_name,
                 'avatar'     => $this->resolveAvatarUrl($this->user->image),
+                'role'       => $this->user->role,
             ],
             'replies_count' => $this->whenCounted('replies_count'),
             'reply_preview' => $this->when(

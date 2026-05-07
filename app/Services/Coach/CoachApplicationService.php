@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Models\CoachApplication;
 use App\Models\User;
 use App\Services\Notification\NotificationService;
+use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
@@ -33,6 +34,18 @@ class CoachApplicationService
 
         if ($existing) {
             abort(422, 'You already have an active application.');
+        }
+
+        $lastRejected = $user->coachApplication()
+            ->where('status', CoachApplicationStatus::REJECTED->value)
+            ->latest('reviewed_at')
+            ->first();
+
+        if ($lastRejected) {
+            $canReapplyAt = $lastRejected->reviewed_at->addDays(30);
+            if (now()->lt($canReapplyAt)) {
+                abort(422, 'You can reapply on ' . $canReapplyAt->toDateString() . '.');
+            }
         }
 
         $application = DB::transaction(function () use ($user, $description, $files) {
@@ -64,6 +77,55 @@ class CoachApplicationService
         );
 
         return $application;
+    }
+
+    public function getAll(?string $status = null, int $perPage = 20): CursorPaginator
+    {
+        return CoachApplication::with(['user', 'documents'])
+            ->when($status, fn($q) => $q->where('status', $status))
+            ->orderBy('id')
+            ->cursorPaginate($perPage);
+    }
+
+    public function approve(CoachApplication $application, User $admin): CoachApplication
+    {
+        if ($application->status !== CoachApplicationStatus::PENDING) {
+            abort(422, 'Only pending applications can be approved.');
+        }
+
+        DB::transaction(function () use ($application, $admin) {
+            $application->update([
+                'status'      => CoachApplicationStatus::APPROVED,
+                'reviewed_by' => $admin->id,
+                'reviewed_at' => now(),
+            ]);
+
+            $user = $application->user;
+            $user->role = UserRole::COACH;
+            $user->save();
+        });
+
+        $this->notificationService->notifyApplicationApproved($admin, $application->user);
+
+        return $application->load(['user', 'documents']);
+    }
+
+    public function reject(CoachApplication $application, User $admin, string $reason): CoachApplication
+    {
+        if ($application->status !== CoachApplicationStatus::PENDING) {
+            abort(422, 'Only pending applications can be rejected.');
+        }
+
+        $application->update([
+            'status'           => CoachApplicationStatus::REJECTED,
+            'rejection_reason' => $reason,
+            'reviewed_by'      => $admin->id,
+            'reviewed_at'      => now(),
+        ]);
+
+        $this->notificationService->notifyApplicationRejected($admin, $application->user, $reason);
+
+        return $application->load(['user', 'documents']);
     }
 
     private function buildFileName(UploadedFile $file): string
