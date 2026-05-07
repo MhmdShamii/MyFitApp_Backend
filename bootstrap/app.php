@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\AiServiceException;
+use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureMealIsLoggable;
 use App\Http\Middleware\EnsureOnboardingStep;
 use App\Http\Middleware\EnsureOwnership;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'ensure.step'   => EnsureOnboardingStep::class,
             'ensure.owns'   => EnsureOwnership::class,
             'meal.loggable' => EnsureMealIsLoggable::class,
+            'admin'         => EnsureAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

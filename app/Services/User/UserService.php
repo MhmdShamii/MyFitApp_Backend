@@ -4,6 +4,7 @@ namespace App\Services\User;
 
 use App\Enums\UserOnboardingSteps;
 use App\Models\User;
+use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,32 @@ use Illuminate\Support\Str;
 
 class UserService
 {
+
+    public function updateRole(User $user, string $role, User $admin): User
+    {
+        if ($user->id === $admin->id) {
+            abort(422, 'You cannot change your own role.');
+        }
+
+        $user->role = $role;
+        $user->save();
+
+        return $user->fresh();
+    }
+
+    public function getUsers(?string $search, ?string $role, ?string $onboardingStep, int $perPage = 20): CursorPaginator
+    {
+        return User::query()
+            ->when($search, function ($q) use ($search) {
+                $lower = strtolower($search);
+                $q->whereRaw("LOWER(CONCAT(first_name, ' ', last_name)) LIKE ?", ["%{$lower}%"])
+                  ->orWhereRaw('LOWER(email) LIKE ?', ["%{$lower}%"]);
+            })
+            ->when($role, fn($q) => $q->where('role', $role))
+            ->when($onboardingStep, fn($q) => $q->where('onboarding_step', $onboardingStep))
+            ->orderBy('id')
+            ->cursorPaginate($perPage);
+    }
 
     public function returnUser(Request $request): User
     {

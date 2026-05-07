@@ -7,6 +7,7 @@ use App\Http\Requests\User\CompleteMainInfoRequest;
 use App\Http\Requests\User\UpdateAvatarRequest;
 use App\Http\Requests\User\UpdateCoverImageRequest;
 use App\Http\Requests\User\UpdateUserRequest;
+use App\Http\Requests\User\UpdateUserRoleRequest;
 use App\Http\Resources\User\UserPublicProfileResource;
 use App\Http\Resources\User\UserResource;
 use App\Http\Responses\ApiResponse;
@@ -24,6 +25,31 @@ class UserController extends Controller
     public function __construct(UserService $userService)
     {
         $this->userService = $userService;
+    }
+
+    public function updateRole(UpdateUserRoleRequest $request, User $user): JsonResponse
+    {
+        $user = $this->userService->updateRole($user, $request->validated('role'), $request->user());
+
+        return $this->success(new UserResource($user), 'User role updated successfully.', 'user');
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $paginator = $this->userService->getUsers(
+            $request->query('search'),
+            $request->query('role'),
+            $request->query('onboarding_step'),
+        );
+
+        return $this->paginated(
+            UserResource::collection($paginator->items()),
+            [
+                'next_cursor' => $paginator->nextCursor()?->encode(),
+                'has_more'    => $paginator->hasMorePages(),
+            ],
+            'Users fetched successfully.'
+        );
     }
 
     public function userProfile(User $user, Request $request): JsonResponse

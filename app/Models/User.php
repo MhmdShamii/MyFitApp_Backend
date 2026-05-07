@@ -63,6 +63,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(UserHealthCondition::class);
     }
 
+    public function coachApplication()
+    {
+        return $this->hasMany(CoachApplication::class);
+    }
+
     public function dailyLogs()
     {
         return $this->hasMany(DailyLog::class);
