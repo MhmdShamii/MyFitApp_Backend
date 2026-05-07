@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Analytics\AdminAnalyticsController;
 use App\Http\Controllers\Analytics\AnalyticsController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Meal\DailyLogingController;
@@ -112,6 +113,8 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::prefix('admin')->middleware('admin')->group(function () {
+            Route::get('/analytics', [AdminAnalyticsController::class, 'overview']);
+
             Route::get('/users', [UserController::class, 'index']);
             Route::patch('/users/{user}/role', [UserController::class, 'updateRole']);
 
