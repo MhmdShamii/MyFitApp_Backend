@@ -14,16 +14,16 @@ class ChatService
 {
     private const CONTEXT_WINDOW = 10;
 
+    private const SUMMARIZE_EVERY = 10;
+
     public function sendMessage(string $message, string $profileId): string
     {
         $userInfo = $this->getUserInfo($profileId);
 
-        return DB::Transaction(function () use ($message, $profileId, $userInfo) {
-
+        $result = DB::transaction(function () use ($message, $profileId, $userInfo) {
             $conversation = $this->findOrCreateConversation($profileId);
             $this->insertMessage($conversation->id, 'user', $message);
-
-            $history = $this->buildHistory($conversation->id);
+            $history = $this->buildHistory($conversation);
 
             $response = OpenAI::chat()->create([
                 'model' => env('OPENAI_MODEL_CHAT', 'gpt-4o-2024-08-06'),
@@ -36,11 +36,21 @@ class ChatService
 
             $aiContent = $response->choices[0]->message->content;
             $this->insertMessage($conversation->id, 'assistant', $aiContent);
-
             $conversation->update(['last_active_at' => now()]);
 
-            return $aiContent;
+            return [
+                'content' => $aiContent,
+                'conversation' => $conversation,
+                'count' => ConversationMessages::where('conversation_id', $conversation->id)->count(),
+            ];
         });
+
+        // Summarization runs OUTSIDE transaction
+        if ($result['count'] % self::SUMMARIZE_EVERY === 0) {
+            $this->summarize($result['conversation']);
+        }
+
+        return $result['content'];
     }
 
     public function getMessageHistory(string $profileId, int $perPage = 20): CursorPaginator
@@ -114,16 +124,27 @@ class ChatService
         ];
     }
 
-    private function buildHistory(int $conversationId): array
+    private function buildHistory(Conversations $conversation): array
     {
-        return ConversationMessages::where('conversation_id', $conversationId)
+        $history = [];
+
+        if ($conversation->summary) {
+            $history[] = [
+                'role' => 'assistant',
+                'content' => "Summary of our earlier conversation: {$conversation->summary}",
+            ];
+        }
+
+        $messages = ConversationMessages::where('conversation_id', $conversation->id)
             ->orderBy('created_at', 'desc')
             ->limit(self::CONTEXT_WINDOW)
-            ->get(['role', 'content'])
+            ->get()
             ->reverse()
             ->values()
-            ->map(fn ($msg) => ['role' => $msg->role, 'content' => $msg->content])
+            ->map(fn ($m) => ['role' => $m->role, 'content' => $m->content])
             ->toArray();
+
+        return array_merge($history, $messages);
     }
 
     private function insertMessage(string $conversationId, string $role, string $content): void
@@ -143,6 +164,49 @@ class ChatService
         }
 
         return $conversation;
+    }
+
+    private function summarize(Conversations $conversation): void
+    {
+        $messages = ConversationMessages::where('conversation_id', $conversation->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(self::SUMMARIZE_EVERY)
+            ->get()
+            ->reverse()
+            ->map(fn ($m) => "{$m->role}: {$m->content}")
+            ->implode("\n");
+
+        $existingSummary = $conversation->summary
+            ? "Previous summary:\n{$conversation->summary}\n\n"
+            : '';
+
+        $prompt = <<<PROMPT
+    {$existingSummary}
+    New messages to incorporate:
+    {$messages}
+
+    Create a comprehensive updated summary that captures:
+    - All food preferences and dislikes mentioned
+    - Health related concerns raised
+    - Goals and progress discussed
+    - Important decisions or commitments made
+    - Patterns in eating behavior noted
+
+    Be concise but complete. Maximum 200 words.
+    PROMPT;
+
+        $response = OpenAI::chat()->create([
+            'model' => env('OPENAI_MODEL_CLASSIFY'),
+            'temperature' => 0,
+            'max_completion_tokens' => 300,
+            'messages' => [
+                ['role' => 'user', 'content' => $prompt],
+            ],
+        ]);
+
+        $conversation->update([
+            'summary' => $response->choices[0]->message->content,
+        ]);
     }
 
     private function buildSystemPrompt(array $userInfo): string
@@ -184,6 +248,8 @@ class ChatService
     - Questions about other specific people's diets
       (celebrities, athletes, public figures)
     - Anything completely unrelated to food and nutrition
+    - Creative writing requests (poems, stories, songs)
+      even if the topic is food related
 
     When asked something outside these boundaries respond with:
     "I am your nutrition assistant. I can help with your
@@ -214,6 +280,7 @@ class ChatService
     - Activity level : {$userInfo['activity_level']}
     - Goal           : {$userInfo['goal']}
     - Dietary prefs  : {$userInfo['dietary_preferences']}
+    - Conditions     : {$conditions}
 
     === DAILY TARGETS ===
     - Calories : {$targets['calories']} kcal
@@ -232,6 +299,10 @@ class ChatService
     - If data is missing say so honestly and ask the user to log more
     - Never provide medical diagnoses or replace medical advice
     - Always recommend consulting a doctor for medical decisions
+    - If the user states a food preference or dislike earlier 
+    in the conversation remember it for the entire session.
+    Never suggest a food the user has said they dislike
+    even if it is nutritionally appropriate.
     PROMPT;
     }
 }
