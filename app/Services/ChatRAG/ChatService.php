@@ -280,8 +280,7 @@ class ChatService
     - Activity level : {$userInfo['activity_level']}
     - Goal           : {$userInfo['goal']}
     - Dietary prefs  : {$userInfo['dietary_preferences']}
-    - Conditions     : {$conditions}
-
+    
     === DAILY TARGETS ===
     - Calories : {$targets['calories']} kcal
     - Protein  : {$targets['protein_g']}g
