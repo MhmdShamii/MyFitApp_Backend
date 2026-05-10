@@ -6,6 +6,7 @@ use App\Models\ConversationMessages;
 use App\Models\Conversations;
 use App\Models\DailySummary;
 use App\Models\UserProfile;
+use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Support\Facades\DB;
 use OpenAI\Laravel\Facades\OpenAI;
 
@@ -42,9 +43,13 @@ class ChatService
         });
     }
 
-    public function getMessageHistory(): array
+    public function getMessageHistory(string $profileId, int $perPage = 20): CursorPaginator
     {
-        return [];
+        $conversation = Conversations::where('profile_id', $profileId)->first();
+
+        return ConversationMessages::where('conversation_id', $conversation?->id ?? 0)
+            ->orderBy('id', 'desc')
+            ->cursorPaginate($perPage);
     }
 
     private function getUserInfo(string $profileId): array

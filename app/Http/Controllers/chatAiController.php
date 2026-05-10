@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\sendMessageRequest;
 use App\Http\Responses\ApiResponse;
 use App\Services\ChatRAG\ChatService;
+use Illuminate\Http\Request;
 
 class ChatAiController extends Controller
 {
@@ -19,10 +20,20 @@ class ChatAiController extends Controller
         return $this->success($response, 'Message sent successfully', dataKey: 'chat_response');
     }
 
-    public function getMessageHistory()
+    public function getMessageHistory(Request $request)
     {
-        $history = $this->chatService->getMessageHistory();
+        $paginator = $this->chatService->getMessageHistory(
+            auth()->user()->profile->id,
+            $request->integer('per_page', 20),
+        );
 
-        return $this->success($history, 'Message history retrieved successfully', dataKey: 'chat_history');
+        return $this->paginated(
+            $paginator->items(),
+            [
+                'next_cursor' => $paginator->nextCursor()?->encode(),
+                'has_more'    => $paginator->hasMorePages(),
+            ],
+            'Message history retrieved successfully',
+        );
     }
 }
