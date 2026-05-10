@@ -14,18 +14,20 @@ class ChatService
 
     public function sendMessage(string $message, string $profileId): string
     {
-        return DB::Transaction(function () use ($message, $profileId) {
+        $userInfo = $this->getUserInfo($profileId);
+
+        return DB::Transaction(function () use ($message, $profileId, $userInfo) {
 
             $conversation = $this->findOrCreateConversation($profileId);
             $this->insertMessage($conversation->id, 'user', $message);
 
-            $profile = UserProfile::findOrFail($profileId);
             $history = $this->buildHistory($conversation->id);
 
             $response = OpenAI::chat()->create([
-                'model' => env('OPENAI_MODEL_STAGE2', 'gpt-4o-mini'),
+                'model' => env('OPENAI_MODEL_CHAT', 'gpt-4o-2024-08-06'),
+                'max_completion_tokens' => 500,
                 'messages' => [
-                    ['role' => 'system', 'content' => $this->buildSystemPrompt($profile)],
+                    ['role' => 'system', 'content' => $this->buildSystemPrompt($userInfo)],
                     ...$history,
                 ],
             ]);
@@ -42,6 +44,43 @@ class ChatService
     public function getMessageHistory(): array
     {
         return [];
+    }
+
+    private function getUserInfo(string $profileId): array
+    {
+        $profile = UserProfile::with(['user.country', 'user.healthConditions.condition'])
+            ->findOrFail($profileId);
+
+        $user = $profile->user;
+
+        $age = $profile->date_of_birth
+            ? $profile->date_of_birth->age
+            : null;
+
+        $healthConditions = $user->healthConditions
+            ->map(fn ($uc) => $uc->condition?->name ?? $uc->custom_condition)
+            ->filter()
+            ->values()
+            ->toArray();
+
+        return [
+            'age' => $age,
+            'gender' => $profile->gender?->value,
+            'region' => $user->country?->name,
+            'weight_kg' => $profile->weight_kg,
+            'height_cm' => $profile->height_cm,
+            'body_fat_pct' => $profile->body_fat_pct,
+            'activity_level' => $profile->activity_level?->value,
+            'goal' => $profile->goal?->value,
+            'dietary_preferences' => $profile->dietary_preferences?->value,
+            'targets' => [
+                'calories' => $profile->daily_calorie_target,
+                'protein_g' => $profile->daily_protein_g,
+                'carbs_g' => $profile->daily_carbs_g,
+                'fat_g' => $profile->daily_fat_g,
+            ],
+            'health_conditions' => $healthConditions,
+        ];
     }
 
     private function buildHistory(int $conversationId): array
@@ -75,16 +114,30 @@ class ChatService
         return $conversation;
     }
 
-    private function buildSystemPrompt(UserProfile $profile): string
+    private function buildSystemPrompt(array $userInfo): string
     {
+        $conditions = ! empty($userInfo['health_conditions'])
+            ? implode(', ', $userInfo['health_conditions'])
+            : 'None reported';
+
+        $targets = $userInfo['targets'];
+
         return <<<PROMPT
         You are a personal nutrition assistant for a NutriSphere user.
 
         User profile:
-        - Goal: {$profile->goal?->value}
-        - Activity level: {$profile->activity_level?->value}
-        - Daily calorie target: {$profile->daily_calorie_target} kcal
-        - Protein target: {$profile->daily_protein_g}g | Carbs: {$profile->daily_carbs_g}g | Fat: {$profile->daily_fat_g}g
+        - Age: {$userInfo['age']}
+        - Gender: {$userInfo['gender']}
+        - Region: {$userInfo['region']}
+        - Weight: {$userInfo['weight_kg']} kg | Height: {$userInfo['height_cm']} cm | Body fat: {$userInfo['body_fat_pct']}%
+        - Activity level: {$userInfo['activity_level']}
+        - Goal: {$userInfo['goal']}
+        - Dietary preferences: {$userInfo['dietary_preferences']}
+        - Health conditions: {$conditions}
+
+        Daily targets:
+        - Calories: {$targets['calories']} kcal
+        - Protein: {$targets['protein_g']}g | Carbs: {$targets['carbs_g']}g | Fat: {$targets['fat_g']}g
 
         Answer questions about nutrition, meal planning, and health goals based on this profile.
         Be concise and practical. Never provide medical diagnoses.
