@@ -3,19 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\sendMessageRequest;
-use App\Services\ChatRAG\chatService;
+use App\Services\ChatRAG\ChatService;
+use App\Http\Responses\ApiResponse;
 
-class chatAiController extends Controller
+class ChatAiController extends Controller
 {
-    public function __construct(private chatService $chatService){}
+    use ApiResponse;
 
-    public function sendMessage(sendMessageRequest $request){
+    public function __construct(private ChatService $chatService) {}
+
+    public function sendMessage(sendMessageRequest $request)
+    {   
         $response = $this->chatService->sendMessage($request->input('message'));
-        return response()->json(['message' => $response]);
+        return $this->success($response, 'Message sent successfully', dataKey: 'chat_response');
     }
 
-    public function getMessageHistory(){
-        $response = $this->chatService->getMessageHistory();
-        return response()->json(['message' => $response]);
+    public function getMessageHistory()
+    {
+        $history = $this->chatService->getMessageHistory();
+        return $this->success($history, 'Message history retrieved successfully', dataKey: 'chat_history');
     }
 }
