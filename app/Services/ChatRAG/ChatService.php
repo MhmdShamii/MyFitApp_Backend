@@ -4,6 +4,7 @@ namespace App\Services\ChatRAG;
 
 use App\Models\ConversationMessages;
 use App\Models\Conversations;
+use App\Models\DailySummary;
 use App\Models\UserProfile;
 use Illuminate\Support\Facades\DB;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -80,6 +81,31 @@ class ChatService
                 'fat_g' => $profile->daily_fat_g,
             ],
             'health_conditions' => $healthConditions,
+            'daily_summary' => $this->getDailySummary($profile),
+        ];
+    }
+
+    private function getDailySummary(UserProfile $profile): ?array
+    {
+        $summary = DailySummary::where('user_id', $profile->user_id)
+            ->whereDate('date', today())
+            ->first();
+
+        if (! $summary) {
+            return null;
+        }
+
+        return [
+            'calories_consumed' => $summary->calories_consumed,
+            'protein_consumed' => $summary->protein_consumed,
+            'carbs_consumed' => $summary->carbs_consumed,
+            'fats_consumed' => $summary->fats_consumed,
+            'fiber_consumed' => $summary->fiber_consumed,
+            'logs_count' => $summary->logs_count,
+            'calories_remaining' => $profile->daily_calorie_target - $summary->calories_consumed,
+            'protein_remaining' => $profile->daily_protein_g - $summary->protein_consumed,
+            'carbs_remaining' => $profile->daily_carbs_g - $summary->carbs_consumed,
+            'fats_remaining' => $profile->daily_fat_g - $summary->fats_consumed,
         ];
     }
 
@@ -121,6 +147,19 @@ class ChatService
             : 'None reported';
 
         $targets = $userInfo['targets'];
+        $summary = $userInfo['daily_summary'];
+
+        $intakeSection = $summary
+            ? <<<INTAKE
+
+            Today's intake so far ({$summary['logs_count']} log(s)):
+            - Calories:  {$summary['calories_consumed']} / {$targets['calories']} kcal  ({$summary['calories_remaining']} remaining)
+            - Protein:   {$summary['protein_consumed']}g / {$targets['protein_g']}g  ({$summary['protein_remaining']}g remaining)
+            - Carbs:     {$summary['carbs_consumed']}g / {$targets['carbs_g']}g  ({$summary['carbs_remaining']}g remaining)
+            - Fat:       {$summary['fats_consumed']}g / {$targets['fat_g']}g  ({$summary['fats_remaining']}g remaining)
+            - Fiber:     {$summary['fiber_consumed']}g logged
+            INTAKE
+            : "\n        Today's intake: No food logged yet today.";
 
         return <<<PROMPT
         You are a personal nutrition assistant for a NutriSphere user.
@@ -138,7 +177,7 @@ class ChatService
         Daily targets:
         - Calories: {$targets['calories']} kcal
         - Protein: {$targets['protein_g']}g | Carbs: {$targets['carbs_g']}g | Fat: {$targets['fat_g']}g
-
+        {$intakeSection}
         Answer questions about nutrition, meal planning, and health goals based on this profile.
         Be concise and practical. Never provide medical diagnoses.
         PROMPT;
