@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\sendMessageRequest;
 
 class chatAiController extends Controller
 {
-    public function sendMessage(){
-        return response()->json(['message' => 'Message sent to AI']);
+    public function sendMessage(sendMessageRequest $request){
+        return response()->json(['message' => $request->input('message')]);
     }
-    
+
     public function getMessageHistory(){
         return response()->json(['message' => 'Message history retrieved']);
     }
