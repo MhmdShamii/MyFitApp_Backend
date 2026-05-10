@@ -14,7 +14,7 @@ class ChatAiController extends Controller
 
     public function sendMessage(sendMessageRequest $request)
     {   
-        $response = $this->chatService->sendMessage($request->input('message'));
+        $response = $this->chatService->sendMessage($request->input('message'), Auth()->user()->profile->id);
         return $this->success($response, 'Message sent successfully', dataKey: 'chat_response');
     }
 

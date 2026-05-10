@@ -13,11 +13,10 @@ return new class extends Migration
     {
         Schema::create('conversations', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('profile_id');
+            $table->foreignId('profile_id')->constrained('user_profile')->cascadeOnDelete();
             $table->string('title', 255)->nullable();
             $table->text('summary')->nullable();
             $table->timestamp('last_active_at')->nullable();
-            $table->foreign('profile_id')->references('id')->on('profiles')->onDelete('cascade');
             $table->timestamps();
         });
     }
