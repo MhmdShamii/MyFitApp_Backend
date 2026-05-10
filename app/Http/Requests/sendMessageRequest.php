@@ -23,8 +23,7 @@ class sendMessageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'message'         => 'required|string|max:2000',
-            'conversation_id' => 'nullable|integer|exists:conversations,id',
+            'message' => 'required|string|max:2000',
         ];
     }
 }
