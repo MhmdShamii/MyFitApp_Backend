@@ -16,6 +16,7 @@ use App\Http\Controllers\Social\FollowController;
 use App\Http\Controllers\Social\LikeController;
 use App\Http\Controllers\Coach\CoachApplicationController;
 use App\Http\Controllers\User\UserMealController;
+use App\Http\Controllers\chatAiController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -31,6 +32,12 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::middleware('auth:sanctum')->group(function () {
+
+        Route::prefix('chat')->group(function () {
+            Route::post('/', [chatAiController::class, 'sendMessage']);
+            Route::get('/history', [chatAiController::class, 'getMessageHistory']);
+        });
+
         Route::get('/health-conditions', [HealthConditionController::class, 'index']);
 
         Route::prefix('auth')->group(function () {
