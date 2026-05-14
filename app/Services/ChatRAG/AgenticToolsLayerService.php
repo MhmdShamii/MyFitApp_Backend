@@ -78,10 +78,11 @@ class AgenticToolsLayerService
             $hit ? $daysHit++ : $daysMissed++;
             $totalCalories += $s->calories_consumed;
 
-            if (! $best || $s->calories_consumed > $best->calories_consumed) {
+            $deviation = abs($s->calories_consumed - $s->calories_target);
+            if (! $best || $deviation < abs($best->calories_consumed - $best->calories_target)) {
                 $best = $s;
             }
-            if (! $worst || $s->calories_consumed < $worst->calories_consumed) {
+            if (! $worst || $deviation > abs($worst->calories_consumed - $worst->calories_target)) {
                 $worst = $s;
             }
 
@@ -100,8 +101,8 @@ class AgenticToolsLayerService
         - Average daily calories : {$avgCalories} kcal
         - Days target hit        : {$daysHit}
         - Days target missed     : {$daysMissed}
-        - Best day               : {$bestDay} ({$best?->calories_consumed} kcal)
-        - Worst day              : {$worstDay} ({$worst?->calories_consumed} kcal)
+        - Best day  (closest to target) : {$bestDay} ({$best?->calories_consumed} / {$best?->calories_target} kcal)
+        - Worst day (furthest from target) : {$worstDay} ({$worst?->calories_consumed} / {$worst?->calories_target} kcal)
         RESULT;
     }
 
@@ -109,12 +110,15 @@ class AgenticToolsLayerService
     {
         $profile = UserProfile::findOrFail($profileId);
 
+        $fiberTarget = $profile->daily_fiber_g ?? 25;
+
         return <<<RESULT
         User Targets:
         - Calories     : {$profile->daily_calorie_target} kcal
         - Protein      : {$profile->daily_protein_g}g
         - Carbs        : {$profile->daily_carbs_g}g
         - Fat          : {$profile->daily_fat_g}g
+        - Fiber        : {$fiberTarget}g
         - Goal         : {$profile->goal?->value}
         - Activity     : {$profile->activity_level?->value}
         RESULT;
@@ -158,7 +162,7 @@ class AgenticToolsLayerService
         RESULT;
     }
 
-    public function searchMeals(string $profileId, string $query, ?int $maxCalories = null, ?int $minProtein = null): string
+    public function searchMeals(string $query, ?int $maxCalories = null, ?int $minProtein = null): string
     {
         $results = MealPost::query()
             ->join('meal_macros', 'meal_posts.fingerprint', '=', 'meal_macros.fingerprint')
@@ -195,7 +199,7 @@ class AgenticToolsLayerService
                     'protein_target' => $profile->daily_protein_g,
                     'carbs_target' => $profile->daily_carbs_g,
                     'fats_target' => $profile->daily_fat_g,
-                    'fiber_target' => 0,
+                    'fiber_target' => $profile->daily_fiber_g ?? 25,
                     'logs_count' => 0,
                 ]
             );
