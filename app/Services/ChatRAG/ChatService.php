@@ -23,10 +23,13 @@ class ChatService
     public function sendMessage(string $message, string $profileId): string
     {
         $userInfo = $this->getUserInfo($profileId);
-        $this->memoryLayerService->extractPrefrencesFromMessage($profileId, $message);
+
         $result = DB::transaction(function () use ($message, $profileId, $userInfo) {
+            $this->memoryLayerService->extractPrefrencesFromMessage($profileId, $message);
+
             $conversation = $this->findOrCreateConversation($profileId);
             $this->insertMessage($conversation->id, 'user', $message);
+
             $history = $this->buildHistory($conversation);
 
             $response = OpenAI::chat()->create([
@@ -83,6 +86,12 @@ class ChatService
             ->values()
             ->toArray();
 
+        $foodPreferences = $this->memoryLayerService->getUserPrefrences($profileId);
+
+        $foodPreferencesStr = ! empty($foodPreferences)
+           ? implode(', ', array_map(fn ($p) => "{$p['key']} ({$p['value']})", $foodPreferences))
+           : 'None reported';
+
         return [
             'age' => $age,
             'gender' => $profile->gender?->value,
@@ -93,6 +102,7 @@ class ChatService
             'activity_level' => $profile->activity_level?->value,
             'goal' => $profile->goal?->value,
             'dietary_preferences' => $profile->dietary_preferences?->value,
+            'preferences' => $foodPreferencesStr,
             'targets' => [
                 'calories' => $profile->daily_calorie_target,
                 'protein_g' => $profile->daily_protein_g,
@@ -261,6 +271,9 @@ class ChatService
     question. What would you like to know?"
 
     Never make exceptions to this rule.
+
+    === USER FOOD PREFRENCES ===
+    {$userInfo['preferences']}
 
     === HEALTH CONDITION RULES ===
     The user has the following health conditions: {$conditions}

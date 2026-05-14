@@ -52,6 +52,16 @@ class MemoryLayerService
         return $preferences;
     }
 
+    public function getUserPrefrences(string $profileId): array
+    {
+        return UserMemory::where('profile_id', $profileId)
+            ->get()
+            ->map(function ($memory) {
+                return ['key' => $memory->key, 'value' => $memory->value];
+            })
+            ->toArray();
+    }
+
     public function updateUserPrefrences(string $profileId, array $preferences): void
     {
         foreach ($preferences as $preference) {
