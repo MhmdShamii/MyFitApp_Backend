@@ -9,10 +9,11 @@ use App\Models\DailySummary;
 use App\Models\MealPost;
 use App\Models\UserProfile;
 use Illuminate\Support\Facades\DB;
+use OpenAI\Laravel\Facades\OpenAI;
 
 class AgenticToolsLayerService
 {
-    public static function definitions(): array
+    public function getToolDefinitions(): array
     {
         return [
             [
@@ -150,6 +151,70 @@ class AgenticToolsLayerService
                 ],
             ],
         ];
+    }
+
+    public function run(array $messages, string $profileId): string
+    {
+        $payload = [
+            'model' => env('OPENAI_MODEL_CHAT', 'gpt-4o-2024-08-06'),
+            'max_completion_tokens' => 1000,
+            'tools' => $this->getToolDefinitions(),
+            'tool_choice' => 'auto',
+            'messages' => $messages,
+        ];
+
+        $lastContent = '';
+
+        for ($i = 0; $i < 5; $i++) {
+            $response = OpenAI::chat()->create($payload);
+            $choice = $response->choices[0];
+            $lastContent = $choice->message->content ?? $lastContent;
+
+            if ($choice->finishReason !== 'tool_calls') {
+                return $choice->message->content ?? 'I was unable to complete your request. Please try again.';
+            }
+
+            $assistantMessage = [
+                'role' => 'assistant',
+                'content' => $choice->message->content,
+                'tool_calls' => array_map(fn ($tc) => [
+                    'id' => $tc->id,
+                    'type' => 'function',
+                    'function' => [
+                        'name' => $tc->function->name,
+                        'arguments' => $tc->function->arguments,
+                    ],
+                ], $choice->message->toolCalls),
+            ];
+
+            $payload['messages'][] = $assistantMessage;
+
+            foreach ($choice->message->toolCalls as $toolCall) {
+                $arguments = json_decode($toolCall->function->arguments, true) ?? [];
+
+                $payload['messages'][] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $toolCall->id,
+                    'content' => $this->executeTool($toolCall->function->name, $arguments, $profileId),
+                ];
+            }
+        }
+
+        return $lastContent ?: 'I was unable to complete your request. Please try again.';
+    }
+
+    private function executeTool(string $toolName, array $arguments, string $profileId): string
+    {
+        return match ($toolName) {
+            'get_today_logs' => $this->getTodayLogs($profileId),
+            'get_weekly_summary' => $this->getWeeklySummary($profileId, $arguments['days'] ?? 7),
+            'get_user_targets' => $this->getUserTargets($profileId),
+            'get_meal_details' => $this->getMealDetails($arguments['meal_post_id']),
+            'search_meals' => $this->searchMeals($arguments['query'], $arguments['max_calories'] ?? null, $arguments['min_protein'] ?? null),
+            'log_meal' => $this->logMeal($profileId, $arguments['name'], (float) $arguments['calories'], (float) $arguments['protein'], (float) $arguments['carbs'], (float) $arguments['fats'], (float) ($arguments['fiber'] ?? 0)),
+            'delete_last_log' => $this->deleteLastLog($profileId),
+            default => "Unknown tool: {$toolName}",
+        };
     }
 
     public function getTodayLogs(string $profileId): string
@@ -355,6 +420,7 @@ class AgenticToolsLayerService
                 'fats' => $fats,
                 'fiber' => $fiber,
                 'logged_at' => now(),
+                'confirmed_at' => now(),
             ]);
 
             $summary->increment('calories_consumed', $calories);

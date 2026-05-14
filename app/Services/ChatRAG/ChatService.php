@@ -18,6 +18,7 @@ class ChatService
 
     public function __construct(
         private readonly MemoryLayerService $memoryLayerService,
+        private readonly AgenticToolsLayerService $agenticToolsLayer,
     ) {}
 
     public function sendMessage(string $message, string $profileId): string
@@ -32,16 +33,14 @@ class ChatService
 
             $history = $this->buildHistory($conversation);
 
-            $response = OpenAI::chat()->create([
-                'model' => env('OPENAI_MODEL_CHAT', 'gpt-4o-2024-08-06'),
-                'max_completion_tokens' => 500,
-                'messages' => [
+            $aiContent = $this->agenticToolsLayer->run(
+                [
                     ['role' => 'system', 'content' => $this->buildSystemPrompt($userInfo)],
                     ...$history,
                 ],
-            ]);
+                $profileId,
+            );
 
-            $aiContent = $response->choices[0]->message->content;
             $this->insertMessage($conversation->id, 'assistant', $aiContent);
             $conversation->update(['last_active_at' => now()]);
 
