@@ -10,12 +10,28 @@ class MemoryLayerService
     public function extractPrefrencesFromMessage(string $profileId, string $message): array
     {
         $prompt = <<<PROMPT
-        Extract food preferences (likes and dislikes) from the user message below.
-        Return ONLY a JSON array. No markdown, no explanation.
-        Format: [{"key": "food_name", "value": "likes" or "dislikes: reason if given"}]
-        If no food preferences are found, return an empty array: []
+        Extract explicit food preferences from the message.
 
-        Message: "$message"
+        ONLY extract preferences the user clearly stated.
+        Do NOT infer preferences they didn't mention.
+
+        Return ONLY valid JSON array. No markdown, explanation, or extra text.
+
+        Format: [{"key": "food_name", "value": "likes"}, {"key": "food_name", "value": "dislikes"}]
+
+        Examples of what TO extract:
+        - "I hate fish" → [{"key": "fish", "value": "dislikes"}]
+        - "I love spicy food" → [{"key": "spicy food", "value": "likes"}]
+        - "I'm vegetarian" → [{"key": "meat", "value": "dislikes"}]
+
+        Examples of what NOT to extract:
+        - "I ate a lot" → [] (not a preference)
+        - "Food was tasty" → [] (not a specific preference)
+        - "Maybe I don't like pasta" → [] (not explicit enough)
+
+        If no preferences found, return: []
+
+        Message: "{$message}"
         PROMPT;
 
         $response = OpenAI::chat()->create([
@@ -39,15 +55,10 @@ class MemoryLayerService
     public function updateUserPrefrences(string $profileId, array $preferences): void
     {
         foreach ($preferences as $preference) {
-            $this->createOrUpdateUserPreferences($profileId, $preference);
+            UserMemory::updateOrCreate(
+                ['profile_id' => $profileId, 'key' => $preference['key']],
+                ['value' => $preference['value']]
+            );
         }
-    }
-
-    private function createOrUpdateUserPreferences(string $profileId, array $preference): void
-    {
-        UserMemory::updateOrCreate(
-            ['profile_id' => $profileId, 'key' => $preference['key']],
-            ['value' => $preference['value']]
-        );
     }
 }
