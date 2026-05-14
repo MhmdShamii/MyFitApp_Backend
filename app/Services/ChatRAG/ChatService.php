@@ -16,10 +16,14 @@ class ChatService
 
     private const SUMMARIZE_EVERY = 10;
 
+    public function __construct(
+        private readonly MemoryLayerService $memoryLayerService,
+    ) {}
+
     public function sendMessage(string $message, string $profileId): string
     {
         $userInfo = $this->getUserInfo($profileId);
-
+        $this->memoryLayerService->extractPrefrencesFromMessage($profileId, $message);
         $result = DB::transaction(function () use ($message, $profileId, $userInfo) {
             $conversation = $this->findOrCreateConversation($profileId);
             $this->insertMessage($conversation->id, 'user', $message);

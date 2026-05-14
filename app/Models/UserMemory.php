@@ -4,8 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class UserMemorie extends Model
+class UserMemory extends Model
 {
+    protected $table = 'user_assistant_memory';
+
     protected $fillable = [
         'profile_id',
         'key',
