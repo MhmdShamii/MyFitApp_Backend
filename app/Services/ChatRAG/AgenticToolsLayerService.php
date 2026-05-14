@@ -12,6 +12,146 @@ use Illuminate\Support\Facades\DB;
 
 class AgenticToolsLayerService
 {
+    public static function definitions(): array
+    {
+        return [
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_today_logs',
+                    'description' => 'Returns the user\'s food log for today including each meal\'s name, calories, macros, and time logged, plus running totals and remaining targets for calories, protein, carbs, fats, and fiber.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => (object) [],
+                        'required' => [],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_weekly_summary',
+                    'description' => 'Returns a day-by-day calorie and protein summary for the last N days, including whether each day\'s target was hit or missed, average daily calories, and the best and worst days relative to target.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'days' => [
+                                'type' => 'integer',
+                                'description' => 'Number of past days to include. Defaults to 7.',
+                                'default' => 7,
+                            ],
+                        ],
+                        'required' => [],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_user_targets',
+                    'description' => 'Returns the user\'s daily nutrition targets (calories, protein, carbs, fat, fiber), their fitness goal, and activity level.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => (object) [],
+                        'required' => [],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_meal_details',
+                    'description' => 'Returns full details for a specific meal post: macros per serving, ingredient list with portions and units, and preparation steps. Use the meal_post_id returned by search_meals.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'meal_post_id' => [
+                                'type' => 'integer',
+                                'description' => 'The ID of the meal post to retrieve details for.',
+                            ],
+                        ],
+                        'required' => ['meal_post_id'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'search_meals',
+                    'description' => 'Searches the public meal database by name and optional macro filters. Returns up to 5 results with meal name, calories, protein, carbs, fats, and meal_post_id. Use get_meal_details for full ingredient and preparation info.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'query' => [
+                                'type' => 'string',
+                                'description' => 'Meal name keyword to search for.',
+                            ],
+                            'max_calories' => [
+                                'type' => 'integer',
+                                'description' => 'Only return meals with calories at or below this value.',
+                            ],
+                            'min_protein' => [
+                                'type' => 'integer',
+                                'description' => 'Only return meals with protein at or above this value in grams.',
+                            ],
+                        ],
+                        'required' => ['query'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'log_meal',
+                    'description' => 'Logs a meal to the user\'s daily food diary and updates today\'s nutrition totals. Use this when the user confirms they ate something or asks you to log a meal for them. Returns updated remaining calories and protein.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'name' => [
+                                'type' => 'string',
+                                'description' => 'Name of the meal or food item.',
+                            ],
+                            'calories' => [
+                                'type' => 'number',
+                                'description' => 'Total calories for this meal.',
+                            ],
+                            'protein' => [
+                                'type' => 'number',
+                                'description' => 'Protein in grams.',
+                            ],
+                            'carbs' => [
+                                'type' => 'number',
+                                'description' => 'Carbohydrates in grams.',
+                            ],
+                            'fats' => [
+                                'type' => 'number',
+                                'description' => 'Fats in grams.',
+                            ],
+                            'fiber' => [
+                                'type' => 'number',
+                                'description' => 'Fiber in grams. Defaults to 0 if unknown.',
+                                'default' => 0,
+                            ],
+                        ],
+                        'required' => ['name', 'calories', 'protein', 'carbs', 'fats'],
+                    ],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'delete_last_log',
+                    'description' => 'Removes the most recently logged meal from today\'s diary and reverses its contribution to today\'s nutrition totals. Use only when the user explicitly asks to undo or delete their last log entry.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => (object) [],
+                        'required' => [],
+                    ],
+                ],
+            ],
+        ];
+    }
+
     public function getTodayLogs(string $profileId): string
     {
         $profile = UserProfile::findOrFail($profileId);
