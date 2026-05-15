@@ -33,7 +33,7 @@ class ChatService
 
             $history = $this->buildHistory($conversation);
 
-            $aiContent = $this->agenticToolsLayer->run(
+            $structured = $this->agenticToolsLayer->run(
                 [
                     ['role' => 'system', 'content' => $this->buildSystemPrompt($userInfo)],
                     ...$history,
@@ -41,13 +41,13 @@ class ChatService
                 $profileId,
             );
 
-            $this->insertMessage($conversation->id, 'assistant', $aiContent);
+            $this->insertMessage($conversation->id, 'assistant', $structured['chat_response']);
             $conversation->update(['last_active_at' => now()]);
 
             return [
-                'content' => $aiContent,
+                'structured'   => $structured,
                 'conversation' => $conversation,
-                'count' => ConversationMessages::where('conversation_id', $conversation->id)->count(),
+                'count'        => ConversationMessages::where('conversation_id', $conversation->id)->count(),
             ];
         });
 
@@ -56,7 +56,7 @@ class ChatService
             $this->summarize($result['conversation']);
         }
 
-        return $result['content'];
+        return $result['structured'];
     }
 
     public function getMessageHistory(string $profileId, int $perPage = 20): CursorPaginator
