@@ -21,7 +21,7 @@ class ChatService
         private readonly AgenticToolsLayerService $agenticToolsLayer,
     ) {}
 
-    public function sendMessage(string $message, string $profileId): string
+    public function sendMessage(string $message, string $profileId): array
     {
         $userInfo = $this->getUserInfo($profileId);
 
