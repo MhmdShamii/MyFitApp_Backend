@@ -8,67 +8,53 @@ class AgenticToolsLayerService
 {
     use NutritionToolsTrait;
 
-    private string $lastToolCalled = '';
-
-    private array $lastToolData = [];
-
-    public function run(array $messages, string $profileId): array
+    public function run(array $messages, string $profileId): string
     {
-        $this->lastToolCalled = '';
-        $this->lastToolData = [];
+        $payload = [
+            'model' => env('OPENAI_MODEL_CHAT', 'gpt-4o-2024-08-06'),
+            'max_completion_tokens' => 1000,
+            'tools' => $this->getToolDefinitions(),
+            'tool_choice' => 'auto',
+            'messages' => $messages,
+        ];
 
-        $iteration = 0;
+        $lastContent = '';
 
-        while ($iteration < 5) {
-            $response = OpenAI::chat()->create([
-                'model' => env('OPENAI_MODEL_CHAT', 'gpt-4o-2024-08-06'),
-                'max_completion_tokens' => 1000,
-                'messages' => $messages,
-                'tools' => $this->getToolDefinitions(),
-                'tool_choice' => 'auto',
-            ]);
-
+        for ($i = 0; $i < 5; $i++) {
+            $response = OpenAI::chat()->create($payload);
             $choice = $response->choices[0];
+            $lastContent = $choice->message->content ?? $lastContent;
 
-            if ($choice->finishReason === 'stop') {
-                return $this->buildStructuredResponse($choice->message->content ?? '');
+            if ($choice->finishReason !== 'tool_calls') {
+                return $choice->message->content ?? 'I was unable to complete your request. Please try again.';
             }
 
-            if ($choice->finishReason === 'tool_calls') {
-                $messages[] = [
-                    'role' => 'assistant',
-                    'content' => null,
-                    'tool_calls' => array_map(fn ($tc) => [
-                        'id' => $tc->id,
-                        'type' => 'function',
-                        'function' => ['name' => $tc->function->name, 'arguments' => $tc->function->arguments],
-                    ], $choice->message->toolCalls),
+            $payload['messages'][] = [
+                'role' => 'assistant',
+                'content' => $choice->message->content,
+                'tool_calls' => array_map(fn ($tc) => [
+                    'id' => $tc->id,
+                    'type' => 'function',
+                    'function' => ['name' => $tc->function->name, 'arguments' => $tc->function->arguments],
+                ], $choice->message->toolCalls),
+            ];
+
+            foreach ($choice->message->toolCalls as $toolCall) {
+                $arguments = json_decode($toolCall->function->arguments, true) ?? [];
+
+                $payload['messages'][] = [
+                    'role' => 'tool',
+                    'tool_call_id' => $toolCall->id,
+                    'content' => $this->executeTool($toolCall->function->name, $arguments, $profileId),
                 ];
-
-                foreach ($choice->message->toolCalls as $toolCall) {
-                    $arguments = json_decode($toolCall->function->arguments, true) ?? [];
-                    $messages[] = [
-                        'role' => 'tool',
-                        'tool_call_id' => $toolCall->id,
-                        'content' => $this->executeTool($toolCall->function->name, $arguments, $profileId),
-                    ];
-                }
-
-                $iteration++;
-
-                continue;
             }
-
-            break;
         }
 
-        return $this->buildStructuredResponse('I was unable to complete your request. Please try again.');
+        return $lastContent ?: 'I was unable to complete your request. Please try again.';
     }
 
     private function executeTool(string $toolName, array $arguments, string $profileId): string
     {
-        $this->lastToolCalled = $toolName;
-
         $result = match ($toolName) {
             'get_today_logs' => $this->getTodayLogs($profileId),
             'get_weekly_summary' => $this->getWeeklySummary($profileId, $arguments['days'] ?? 7),
@@ -80,26 +66,7 @@ class AgenticToolsLayerService
             default => ['text' => "Unknown tool: {$toolName}", 'data' => null],
         };
 
-        $this->lastToolData = $result['data'] ?? [];
-
         return $result['text'];
-    }
-
-    private function buildStructuredResponse(string $content): array
-    {
-        $type = match ($this->lastToolCalled) {
-            'log_meal' => 'meal_logged',
-            'delete_last_log' => 'meal_deleted',
-            'get_today_logs' => 'macro_summary',
-            'search_meals' => 'meal_recommendation',
-            default => 'text',
-        };
-
-        return [
-            'type' => $type,
-            'chat_response' => $content,
-            'data' => $this->lastToolData ?: null,
-        ];
     }
 
     private function getToolDefinitions(): array
@@ -153,7 +120,7 @@ class AgenticToolsLayerService
                     'parameters' => [
                         'type' => 'object',
                         'properties' => [
-                            'query' => ['type' => 'string',  'description' => 'Meal name or description to search for'],
+                            'query' => ['type' => 'string', 'description' => 'Meal name or description to search for'],
                             'max_calories' => ['type' => 'integer', 'description' => 'Maximum calories filter optional'],
                             'min_protein' => ['type' => 'integer', 'description' => 'Minimum protein in grams filter optional'],
                         ],

@@ -21,7 +21,7 @@ class ChatService
         private readonly AgenticToolsLayerService $agenticToolsLayer,
     ) {}
 
-    public function sendMessage(string $message, string $profileId): array
+    public function sendMessage(string $message, string $profileId): string
     {
         $userInfo = $this->getUserInfo($profileId);
 
@@ -33,7 +33,7 @@ class ChatService
 
             $history = $this->buildHistory($conversation);
 
-            $structured = $this->agenticToolsLayer->run(
+            $aiContent = $this->agenticToolsLayer->run(
                 [
                     ['role' => 'system', 'content' => $this->buildSystemPrompt($userInfo)],
                     ...$history,
@@ -41,13 +41,13 @@ class ChatService
                 $profileId,
             );
 
-            $this->insertMessage($conversation->id, 'assistant', $structured['chat_response']);
+            $this->insertMessage($conversation->id, 'assistant', $aiContent);
             $conversation->update(['last_active_at' => now()]);
 
             return [
-                'structured'   => $structured,
+                'content' => $aiContent,
                 'conversation' => $conversation,
-                'count'        => ConversationMessages::where('conversation_id', $conversation->id)->count(),
+                'count' => ConversationMessages::where('conversation_id', $conversation->id)->count(),
             ];
         });
 
@@ -56,7 +56,7 @@ class ChatService
             $this->summarize($result['conversation']);
         }
 
-        return $result['structured'];
+        return $result['content'];
     }
 
     public function getMessageHistory(string $profileId, int $perPage = 20): CursorPaginator
@@ -314,15 +314,10 @@ class ChatService
     - If data is missing say so honestly and ask the user to log more
     - Never provide medical diagnoses or replace medical advice
     - Always recommend consulting a doctor for medical decisions
-    - If the user states a food preference or dislike earlier
+    - If the user states a food preference or dislike earlier 
     in the conversation remember it for the entire session.
     Never suggest a food the user has said they dislike
     even if it is nutritionally appropriate.
-    - When suggesting meals always call search_meals tool
-    first. If less than 3 results found supplement with
-    suggestions from your nutrition knowledge. Always verify
-    all suggestions against user health conditions. Never
-    suggest meals conflicting with health conditions.
     PROMPT;
     }
 }
