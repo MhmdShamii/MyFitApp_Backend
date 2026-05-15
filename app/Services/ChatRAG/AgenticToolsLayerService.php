@@ -8,8 +8,15 @@ class AgenticToolsLayerService
 {
     use NutritionToolsTrait;
 
-    public function run(array $messages, string $profileId): string
+    private string $lastToolCalled = '';
+
+    private array $lastToolData = [];
+
+    public function run(array $messages, string $profileId): array
     {
+        $this->lastToolCalled = '';
+        $this->lastToolData = [];
+
         $payload = [
             'model' => env('OPENAI_MODEL_CHAT', 'gpt-4o-2024-08-06'),
             'max_completion_tokens' => 1000,
@@ -26,7 +33,7 @@ class AgenticToolsLayerService
             $lastContent = $choice->message->content ?? $lastContent;
 
             if ($choice->finishReason !== 'tool_calls') {
-                return $choice->message->content ?? 'I was unable to complete your request. Please try again.';
+                return $this->buildStructuredResponse($choice->message->content ?? '');
             }
 
             $payload['messages'][] = [
@@ -50,11 +57,13 @@ class AgenticToolsLayerService
             }
         }
 
-        return $lastContent ?: 'I was unable to complete your request. Please try again.';
+        return $this->buildStructuredResponse($lastContent ?: '');
     }
 
     private function executeTool(string $toolName, array $arguments, string $profileId): string
     {
+        $this->lastToolCalled = $toolName;
+
         $result = match ($toolName) {
             'get_today_logs' => $this->getTodayLogs($profileId),
             'get_weekly_summary' => $this->getWeeklySummary($profileId, $arguments['days'] ?? 7),
@@ -66,7 +75,55 @@ class AgenticToolsLayerService
             default => ['text' => "Unknown tool: {$toolName}", 'data' => null],
         };
 
+        $this->lastToolData = $result['data'] ?? [];
+
         return $result['text'];
+    }
+
+    private function buildStructuredResponse(string $content): array
+    {
+        if ($this->lastToolCalled === 'log_meal' && ! empty($this->lastToolData)) {
+            return [
+                'type' => 'meal_logged',
+                'message' => 'Done! '.$this->lastToolData['meal_name'].' has been logged.',
+                'log' => [
+                    'meal_name' => $this->lastToolData['meal_name'],
+                    'calories' => $this->lastToolData['calories'],
+                    'protein' => $this->lastToolData['protein'],
+                    'carbs' => $this->lastToolData['carbs'],
+                    'fats' => $this->lastToolData['fats'],
+                    'fiber' => $this->lastToolData['fiber'],
+                    'calories_remaining' => $this->lastToolData['calories_remaining'],
+                    'protein_remaining' => $this->lastToolData['protein_remaining'],
+                ],
+            ];
+        }
+
+        if ($this->lastToolCalled === 'delete_last_log' && ! empty($this->lastToolData)) {
+            return [
+                'type' => 'meal_deleted',
+                'message' => $this->lastToolData['meal_name'].' has been removed.',
+                'log' => [
+                    'meal_name' => $this->lastToolData['meal_name'],
+                    'calories_removed' => $this->lastToolData['calories_removed'],
+                    'calories_remaining' => $this->lastToolData['calories_remaining'],
+                ],
+            ];
+        }
+
+        $stripped = preg_replace('/^```(?:json)?\s*/i', '', trim($content));
+        $stripped = preg_replace('/\s*```$/', '', $stripped);
+
+        $parsed = json_decode($stripped, true);
+
+        if (json_last_error() === JSON_ERROR_NONE && isset($parsed['type'])) {
+            return $parsed;
+        }
+
+        return [
+            'type' => 'text',
+            'message' => $content,
+        ];
     }
 
     private function getToolDefinitions(): array

@@ -21,7 +21,7 @@ class ChatService
         private readonly AgenticToolsLayerService $agenticToolsLayer,
     ) {}
 
-    public function sendMessage(string $message, string $profileId): string
+    public function sendMessage(string $message, string $profileId): array
     {
         $userInfo = $this->getUserInfo($profileId);
 
@@ -33,7 +33,7 @@ class ChatService
 
             $history = $this->buildHistory($conversation);
 
-            $aiContent = $this->agenticToolsLayer->run(
+            $structured = $this->agenticToolsLayer->run(
                 [
                     ['role' => 'system', 'content' => $this->buildSystemPrompt($userInfo)],
                     ...$history,
@@ -41,11 +41,11 @@ class ChatService
                 $profileId,
             );
 
-            $this->insertMessage($conversation->id, 'assistant', $aiContent);
+            $this->insertMessage($conversation->id, 'assistant', json_encode($structured));
             $conversation->update(['last_active_at' => now()]);
 
             return [
-                'content' => $aiContent,
+                'structured' => $structured,
                 'conversation' => $conversation,
                 'count' => ConversationMessages::where('conversation_id', $conversation->id)->count(),
             ];
@@ -56,7 +56,7 @@ class ChatService
             $this->summarize($result['conversation']);
         }
 
-        return $result['content'];
+        return $result['structured'];
     }
 
     public function getMessageHistory(string $profileId, int $perPage = 20): CursorPaginator
@@ -314,10 +314,42 @@ class ChatService
     - If data is missing say so honestly and ask the user to log more
     - Never provide medical diagnoses or replace medical advice
     - Always recommend consulting a doctor for medical decisions
-    - If the user states a food preference or dislike earlier 
+    - If the user states a food preference or dislike earlier
     in the conversation remember it for the entire session.
     Never suggest a food the user has said they dislike
     even if it is nutritionally appropriate.
+    - When suggesting any meal always respond with
+    type: meal_suggestion JSON format.
+    Never return meal suggestions as plain text.
+    This applies whether the meal comes from the
+    database or from your own knowledge.
+
+    === RESPONSE FORMAT ===
+    You must ALWAYS respond with valid JSON only.
+    No plain text. No markdown. No explanation outside the JSON.
+    Never wrap the JSON in code blocks or backticks.
+
+    For general answers:
+    {"type":"text","message":"your response here"}
+
+    For meal suggestions (when user asks for a meal idea, recommendation,
+    or what to eat — whether from database or generated from your knowledge):
+    YOU MUST ALWAYS use this exact format. Never return plain text for meal suggestions.
+    Even if no database results were found generate a meal using this structure:
+    {"type":"meal_suggestion","message":"brief intro sentence","meal":{"title":"meal name","description":"one sentence description","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0,"ingredients":[{"name":"ingredient name","portion":0,"unit":"g or ml or tbsp etc"}],"steps":[{"step":1,"description":"step description"}],"meal_post_id":null}}
+
+    For today intake summary (when user asks what they ate or their macros today):
+    {"type":"macro_summary","message":"brief intro sentence","summary":{"logs_count":0,"calories":{"consumed":0,"target":0},"protein":{"consumed":0,"target":0},"carbs":{"consumed":0,"target":0},"fats":{"consumed":0,"target":0},"meals":[{"name":"meal name","calories":0,"logged_at":"HH:MM"}]}}
+
+    For weekly nutrition summary (when user asks how their week was):
+    {"type":"weekly_summary","message":"brief intro sentence","summary":{"average_calories":0,"days_hit":0,"days_missed":0,"best_day":"YYYY-MM-DD","worst_day":"YYYY-MM-DD","days":[{"date":"YYYY-MM-DD","calories_consumed":0,"calories_target":0,"status":"HIT"}]}}
+
+    Rules:
+    - Use macro_summary type when you call get_today_logs
+    - Use weekly_summary type when you call get_weekly_summary
+    - Use meal_suggestion type when suggesting a meal (include meal_post_id if found via search_meals, null otherwise)
+    - Use text type for everything else
+    - Never output anything outside the JSON object
     PROMPT;
     }
 }
