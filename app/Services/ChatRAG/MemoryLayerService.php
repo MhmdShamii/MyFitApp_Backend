@@ -15,6 +15,10 @@ class MemoryLayerService
         ONLY extract preferences the user clearly stated.
         Do NOT infer preferences they didn't mention.
 
+        Always correct any spelling mistakes in the food name before storing.
+        Use the standard English spelling of the ingredient.
+        For example: "zuccini" → "zucchini", "brocoli" → "broccoli".
+
         Return ONLY valid JSON array. No markdown, explanation, or extra text.
 
         Format: [{"key": "food_name", "value": "likes"}, {"key": "food_name", "value": "dislikes"}]
