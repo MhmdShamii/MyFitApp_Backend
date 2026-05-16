@@ -27,34 +27,43 @@ class AgenticToolsLayerService
 
         $lastContent = '';
 
-        for ($i = 0; $i < 5; $i++) {
-            $response = OpenAI::chat()->create($payload);
-            $choice = $response->choices[0];
-            $lastContent = $choice->message->content ?? $lastContent;
+        try {
+            for ($i = 0; $i < 5; $i++) {
+                $response = OpenAI::chat()->create($payload);
+                $choice = $response->choices[0];
+                $lastContent = $choice->message->content ?? $lastContent;
 
-            if ($choice->finishReason !== 'tool_calls') {
-                return $this->buildStructuredResponse($choice->message->content ?? '');
-            }
-
-            $payload['messages'][] = [
-                'role' => 'assistant',
-                'content' => $choice->message->content,
-                'tool_calls' => array_map(fn ($tc) => [
-                    'id' => $tc->id,
-                    'type' => 'function',
-                    'function' => ['name' => $tc->function->name, 'arguments' => $tc->function->arguments],
-                ], $choice->message->toolCalls),
-            ];
-
-            foreach ($choice->message->toolCalls as $toolCall) {
-                $arguments = json_decode($toolCall->function->arguments, true) ?? [];
+                if ($choice->finishReason !== 'tool_calls') {
+                    return $this->buildStructuredResponse($choice->message->content ?? '');
+                }
 
                 $payload['messages'][] = [
-                    'role' => 'tool',
-                    'tool_call_id' => $toolCall->id,
-                    'content' => $this->executeTool($toolCall->function->name, $arguments, $profileId),
+                    'role' => 'assistant',
+                    'content' => $choice->message->content,
+                    'tool_calls' => array_map(fn ($tc) => [
+                        'id' => $tc->id,
+                        'type' => 'function',
+                        'function' => ['name' => $tc->function->name, 'arguments' => $tc->function->arguments],
+                    ], $choice->message->toolCalls),
                 ];
+
+                foreach ($choice->message->toolCalls as $toolCall) {
+                    $arguments = json_decode($toolCall->function->arguments, true) ?? [];
+
+                    $payload['messages'][] = [
+                        'role' => 'tool',
+                        'tool_call_id' => $toolCall->id,
+                        'content' => $this->executeTool($toolCall->function->name, $arguments, $profileId),
+                    ];
+                }
             }
+        } catch (\Exception $e) {
+            \Log::error('AgentLoop failed: '.$e->getMessage());
+
+            return [
+                'type'    => 'text',
+                'message' => 'Something went wrong. Please try again.',
+            ];
         }
 
         return $this->buildStructuredResponse($lastContent ?: '');
@@ -71,13 +80,13 @@ class AgenticToolsLayerService
             'get_meal_details' => $this->getMealDetails($arguments['meal_post_id']),
             'search_meals' => $this->searchMeals($arguments['query'], $arguments['max_calories'] ?? null, $arguments['min_protein'] ?? null),
             'log_meal' => $this->logMeal($profileId, $arguments['name'], (float) $arguments['calories'], (float) $arguments['protein'], (float) $arguments['carbs'], (float) $arguments['fats'], (float) ($arguments['fiber'] ?? 0)),
-            'delete_last_log'      => $this->deleteLastLog($profileId),
+            'delete_last_log' => $this->deleteLastLog($profileId),
             'update_daily_targets' => $this->updateDailyTargets(
                 $profileId,
                 isset($arguments['calories']) ? (int) $arguments['calories'] : null,
-                isset($arguments['protein'])  ? (int) $arguments['protein']  : null,
-                isset($arguments['carbs'])    ? (int) $arguments['carbs']    : null,
-                isset($arguments['fat'])      ? (int) $arguments['fat']      : null,
+                isset($arguments['protein']) ? (int) $arguments['protein'] : null,
+                isset($arguments['carbs']) ? (int) $arguments['carbs'] : null,
+                isset($arguments['fat']) ? (int) $arguments['fat'] : null,
             ),
             default => ['text' => "Unknown tool: {$toolName}", 'data' => null],
         };
@@ -108,7 +117,7 @@ class AgenticToolsLayerService
 
         if ($this->lastToolCalled === 'update_daily_targets' && ! empty($this->lastToolData)) {
             return [
-                'type'    => 'targets_updated',
+                'type' => 'targets_updated',
                 'message' => 'Your daily targets have been updated.',
                 'targets' => $this->lastToolData,
             ];
@@ -249,9 +258,9 @@ class AgenticToolsLayerService
                         'type' => 'object',
                         'properties' => [
                             'calories' => ['type' => 'integer', 'description' => 'New daily calorie target in kcal'],
-                            'protein'  => ['type' => 'integer', 'description' => 'New daily protein target in grams'],
-                            'carbs'    => ['type' => 'integer', 'description' => 'New daily carbohydrate target in grams'],
-                            'fat'      => ['type' => 'integer', 'description' => 'New daily fat target in grams'],
+                            'protein' => ['type' => 'integer', 'description' => 'New daily protein target in grams'],
+                            'carbs' => ['type' => 'integer', 'description' => 'New daily carbohydrate target in grams'],
+                            'fat' => ['type' => 'integer', 'description' => 'New daily fat target in grams'],
                         ],
                         'required' => [],
                     ],
