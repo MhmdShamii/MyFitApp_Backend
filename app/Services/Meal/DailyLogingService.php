@@ -9,9 +9,11 @@ use App\Models\MealMacro;
 use App\Models\MealPost;
 use App\Models\User;
 use App\Services\Analytics\PlatformStatsService;
+use App\Services\ChatRAG\FeedbackRecorderService;
 use App\Services\Notification\NotificationService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DailyLogingService
 {
@@ -19,11 +21,12 @@ class DailyLogingService
         private CalculateMacrosService $macrosService,
         private NotificationService $notificationService,
         private PlatformStatsService $platformStatsService,
+        private FeedbackRecorderService $feedbackRecorder,
     ) {}
 
     public function logMealFromPost(MealPost $mealPost, User $user): DailyLog
     {
-        return DB::transaction(function () use ($mealPost, $user) {
+        $log = DB::transaction(function () use ($mealPost, $user) {
             $summary = $this->findOrCreateSummary($user, now()->toDateString(), $user->profile);
             $mealPost->increment('relogs_count');
 
@@ -33,6 +36,10 @@ class DailyLogingService
 
             return $log;
         });
+
+        $this->recordFeedback($user, $log, 'post', $mealPost->id);
+
+        return $log;
     }
 
     public function removeLogFromDailySummary(DailyLog $log): void
@@ -61,7 +68,7 @@ class DailyLogingService
 
     public function logCustomMeal(User $user, array $validatedData): DailyLog
     {
-        return DB::transaction(function () use ($user, $validatedData) {
+        $log = DB::transaction(function () use ($user, $validatedData) {
             $this->discardExistingDraft($user, DailyLogType::CUSTOM);
 
             [, $macros] = $this->macrosService->calculateMealMacrosPipeline($validatedData['ingredients']);
@@ -70,11 +77,15 @@ class DailyLogingService
 
             return $this->createPendingLog($user, $summary, $this->macroToArray($macros), data_get($validatedData, 'name'), data_get($validatedData, 'description'), DailyLogType::CUSTOM);
         });
+
+        $this->recordFeedback($user, $log, 'ingredients');
+
+        return $log;
     }
 
     public function logEstimatedMeal(User $user, array $validatedData): DailyLog
     {
-        return DB::transaction(function () use ($user, $validatedData) {
+        $log = DB::transaction(function () use ($user, $validatedData) {
             $this->discardExistingDraft($user, DailyLogType::ESTIMATE);
 
             $country = $user->load('country')->country;
@@ -89,6 +100,10 @@ class DailyLogingService
 
             return $this->createPendingLog($user, $summary, $this->macroToArray($macros), data_get($validatedData, 'name'), data_get($validatedData, 'description'), DailyLogType::ESTIMATE);
         });
+
+        $this->recordFeedback($user, $log, 'estimate');
+
+        return $log;
     }
 
     public function confirmPendingLog(DailyLog $log): DailyLog
@@ -105,6 +120,25 @@ class DailyLogingService
     }
 
     // helper functions
+
+    private function recordFeedback(User $user, DailyLog $log, string $sourceType, ?int $mealPostId = null): void
+    {
+        try {
+            $this->feedbackRecorder->record(
+                profileId: $user->profile->id,
+                mealTitle: $log->log_name ?? 'Unknown',
+                mealPostId: $mealPostId,
+                sourceType: $sourceType,
+                calories: (float) $log->calories,
+                protein: (float) $log->protein,
+                carbs: (float) $log->carbs,
+                fats: (float) $log->fats,
+                action: 'logged',
+            );
+        } catch (\Throwable $e) {
+            Log::error("Feedback recording failed after {$sourceType} log: " . $e->getMessage());
+        }
+    }
 
     private function findOrCreateSummary(User $user, string $date, $profile): DailySummary
     {

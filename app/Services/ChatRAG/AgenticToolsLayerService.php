@@ -12,6 +12,8 @@ class AgenticToolsLayerService
 
     private array $lastToolData = [];
 
+    public function __construct(private FeedbackRecorderService $feedbackRecorder) {}
+
     public function run(array $messages, string $profileId): array
     {
         $this->lastToolCalled = '';
