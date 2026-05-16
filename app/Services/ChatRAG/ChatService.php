@@ -6,6 +6,7 @@ use App\Models\ConversationMessages;
 use App\Models\Conversations;
 use App\Models\DailySummary;
 use App\Models\UserProfile;
+use App\Services\FeedbackEmbeddingService;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Support\Facades\DB;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -19,10 +20,13 @@ class ChatService
     public function __construct(
         private readonly MemoryLayerService $memoryLayerService,
         private readonly AgenticToolsLayerService $agenticToolsLayer,
+        private readonly FeedbackEmbeddingService $feedbackEmbeddingService,
     ) {}
 
     public function sendMessage(string $message, string $profileId): array
     {
+        $embedding = $this->feedbackEmbeddingService->generateEmbedding($message);
+        dd($embedding);
         $userInfo = $this->getUserInfo($profileId);
 
         $result = DB::transaction(function () use ($message, $profileId, $userInfo) {

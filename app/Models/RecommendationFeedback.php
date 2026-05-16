@@ -2,9 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\FeedbackAction;
-use App\Enums\FeedbackSourceType;
-use App\Enums\MealTimeSlot;
 use Illuminate\Database\Eloquent\Model;
 
 class RecommendationFeedback extends Model
@@ -27,13 +24,10 @@ class RecommendationFeedback extends Model
     ];
 
     protected $casts = [
-        'source_type'    => FeedbackSourceType::class,
-        'action'         => FeedbackAction::class,
-        'meal_time_slot' => MealTimeSlot::class,
-        'calories'       => 'decimal:2',
-        'protein'        => 'decimal:2',
-        'carbs'          => 'decimal:2',
-        'fats'           => 'decimal:2',
+        'calories' => 'float',
+        'protein'  => 'float',
+        'carbs'    => 'float',
+        'fats'     => 'float',
     ];
 
     public function profile()

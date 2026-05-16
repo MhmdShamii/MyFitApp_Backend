@@ -7,9 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         DB::statement('CREATE EXTENSION IF NOT EXISTS vector');
@@ -19,9 +16,9 @@ return new class extends Migration
             $table->unsignedBigInteger('profile_id');
             $table->string('meal_title', 255);
             $table->unsignedBigInteger('meal_post_id')->nullable();
-            $table->enum('source_type', ['bot_suggestion', 'post', 'estimate', 'ingredients']);
-            $table->enum('action', ['logged', 'dismissed', 'not_chosen']);
-            $table->enum('meal_time_slot', ['breakfast', 'lunch', 'snack', 'dinner', 'late_night']);
+            $table->string('source_type', 20);
+            $table->string('action', 20)->default('logged');
+            $table->string('meal_time_slot', 20);
             $table->smallInteger('logged_hour');
             $table->float('calories')->nullable();
             $table->float('protein')->nullable();
@@ -39,9 +36,6 @@ return new class extends Migration
         DB::statement('ALTER TABLE recommendation_feedback ADD COLUMN embedding vector(1536) NULL');
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('recommendation_feedback');
