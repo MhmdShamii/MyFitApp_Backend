@@ -17,7 +17,10 @@ class ChatAiController extends Controller
     {
         $response = $this->chatService->sendMessage($request->input('message'), Auth()->user()->profile->id);
 
-        return $this->success($response, 'Message sent successfully', dataKey: 'chat_response');
+        return response()->json([
+            ...$response,
+            'status' => 'success',
+        ]);
     }
 
     public function getMessageHistory(Request $request)
