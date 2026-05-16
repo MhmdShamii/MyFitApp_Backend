@@ -4,6 +4,7 @@ namespace App\Services\ChatRAG;
 
 use App\Models\RecommendationFeedback;
 use App\Services\EmbeddingService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class FeedbackRecorderService
@@ -51,6 +52,66 @@ class FeedbackRecorderService
                 'meal_title' => $mealTitle,
             ]);
         }
+    }
+
+    public function getFeedbackContext(string $profileId, int $currentHour): string
+    {
+        $timeSlot = $this->getTimeSlot($currentHour);
+
+        $enjoyed = DB::table('recommendation_feedback')
+            ->select('meal_title', DB::raw('count(*) as count'))
+            ->where('profile_id', $profileId)
+            ->where('action', 'logged')
+            ->where('meal_time_slot', $timeSlot)
+            ->groupBy('meal_title')
+            ->orderByDesc('count')
+            ->limit(5)
+            ->get();
+
+        $dismissed = DB::table('recommendation_feedback')
+            ->select('meal_title')
+            ->where('profile_id', $profileId)
+            ->where('action', 'dismissed')
+            ->where('meal_time_slot', $timeSlot)
+            ->distinct()
+            ->pluck('meal_title');
+
+        $notChosen = DB::table('recommendation_feedback')
+            ->select('meal_title')
+            ->where('profile_id', $profileId)
+            ->where('action', 'not_chosen')
+            ->where('meal_time_slot', $timeSlot)
+            ->groupBy('meal_title')
+            ->havingRaw('count(*) >= 3')
+            ->pluck('meal_title');
+
+        $blacklist = $dismissed->merge($notChosen)->unique()->values();
+
+        if ($enjoyed->isEmpty() && $blacklist->isEmpty()) {
+            return 'No recommendation history yet.';
+        }
+
+        $lines = ["Current time slot: {$timeSlot}", ''];
+
+        if ($enjoyed->isNotEmpty()) {
+            $lines[] = "Meals this user enjoys at {$timeSlot}:";
+            foreach ($enjoyed as $row) {
+                $times = $row->count === 1 ? '1 time' : "{$row->count} times";
+                $lines[] = "- {$row->meal_title} (chosen {$times})";
+            }
+        }
+
+        if ($blacklist->isNotEmpty()) {
+            if ($enjoyed->isNotEmpty()) {
+                $lines[] = '';
+            }
+            $lines[] = "Never suggest these at {$timeSlot}:";
+            foreach ($blacklist as $title) {
+                $lines[] = "- {$title}";
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     public function getTimeSlot(int $hour): string
