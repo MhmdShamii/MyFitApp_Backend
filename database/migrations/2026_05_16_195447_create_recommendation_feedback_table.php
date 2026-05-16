@@ -9,7 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('CREATE EXTENSION IF NOT EXISTS vector');
+        try {
+            DB::statement('CREATE EXTENSION IF NOT EXISTS vector');
+        } catch (\Exception $e) {
+            // Extension already exists on this database instance
+        }
 
         Schema::create('recommendation_feedback', function (Blueprint $table) {
             $table->id();
@@ -24,6 +28,7 @@ return new class extends Migration
             $table->float('protein')->nullable();
             $table->float('carbs')->nullable();
             $table->float('fats')->nullable();
+            $table->unsignedSmallInteger('shown_count')->default(1);
             $table->timestamps();
 
             $table->foreign('profile_id')->references('id')->on('user_profile')->onDelete('cascade');
