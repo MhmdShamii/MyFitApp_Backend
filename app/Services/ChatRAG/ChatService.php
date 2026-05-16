@@ -274,6 +274,14 @@ class ChatService
     === USER FOOD PREFRENCES ===
     {$userInfo['preferences']}
 
+    These are ingredients and foods this user explicitly dislikes.
+    Never include any of these as an ingredient in any meal suggestion —
+    not even as a minor ingredient, garnish, or optional addition.
+    Cross-check every single ingredient in every meal against this list
+    before returning the response.
+    Account for spelling variations and typos when matching — for example
+    "zuccini" and "zucchini" are the same ingredient.
+
     === HEALTH CONDITION RULES ===
     The user has the following health conditions: {$conditions}
 
