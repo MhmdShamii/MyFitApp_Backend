@@ -18,7 +18,7 @@ class CommentResource extends JsonResource
                 'id'         => $this->user->id,
                 'first_name' => $this->user->first_name,
                 'last_name'  => $this->user->last_name,
-                'avatar'     => $this->resolveAvatarUrl($this->user->image),
+                'avatar'     => $this->resolveAvatarUrl($this->user->image, $this->user->profile?->gender?->value),
                 'role'       => $this->user->role,
             ],
             'replies_count' => $this->whenCounted('replies_count'),
@@ -29,10 +29,12 @@ class CommentResource extends JsonResource
         ];
     }
 
-    private function resolveAvatarUrl(?string $image): string
+    private function resolveAvatarUrl(?string $image, ?string $gender = null): string
     {
         if ($image === null || $image === 'default.png') {
-            return Storage::disk('s3')->url('avatars/default.png');
+            $default = $gender === 'female' ? 'avatars/default_w.png' : 'avatars/default.png';
+
+            return Storage::disk('s3')->url($default);
         }
 
         if (str_starts_with($image, 'http')) {

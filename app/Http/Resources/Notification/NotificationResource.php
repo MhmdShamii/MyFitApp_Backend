@@ -18,17 +18,19 @@ class NotificationResource extends JsonResource
                 'id'         => $this->actor->id,
                 'first_name' => $this->actor->first_name,
                 'last_name'  => $this->actor->last_name,
-                'avatar'     => $this->resolveAvatarUrl($this->actor->image),
+                'avatar'     => $this->resolveAvatarUrl($this->actor->image, $this->actor->profile?->gender?->value),
                 'role'       => $this->actor->role,
             ],
             'created_at' => $this->created_at->toISOString(),
         ];
     }
 
-    private function resolveAvatarUrl(?string $image): string
+    private function resolveAvatarUrl(?string $image, ?string $gender = null): string
     {
         if ($image === null || $image === 'default.png') {
-            return Storage::disk('s3')->url('avatars/default.png');
+            $default = $gender === 'female' ? 'avatars/default_w.png' : 'avatars/default.png';
+
+            return Storage::disk('s3')->url($default);
         }
 
         if (str_starts_with($image, 'http')) {

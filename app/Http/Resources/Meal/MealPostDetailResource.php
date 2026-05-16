@@ -56,16 +56,18 @@ class MealPostDetailResource extends JsonResource
                 'id'         => $user?->id,
                 'first_name' => $user?->first_name,
                 'last_name'  => $user?->last_name,
-                'avatar'     => $this->resolveAvatarUrl($user?->image),
+                'avatar'     => $this->resolveAvatarUrl($user?->image, $user?->profile?->gender?->value),
                 'role'       => $user?->role,
             ],
         ];
     }
 
-    private function resolveAvatarUrl(?string $image): string
+    private function resolveAvatarUrl(?string $image, ?string $gender = null): string
     {
         if (!$image || $image === 'default.png') {
-            return Storage::disk('s3')->url('avatars/default.png');
+            $default = $gender === 'female' ? 'avatars/default_w.png' : 'avatars/default.png';
+
+            return Storage::disk('s3')->url($default);
         }
 
         if (str_starts_with($image, 'http')) {

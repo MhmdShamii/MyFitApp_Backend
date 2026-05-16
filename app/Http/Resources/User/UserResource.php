@@ -16,7 +16,11 @@ class UserResource extends JsonResource
     private function resolveAvatarUrl(): string
     {
         if ($this->image === null || $this->image === 'default.png') {
-            return Storage::disk('s3')->url('avatars/default.png');
+            $default = $this->profile?->gender?->value === 'female'
+                ? 'avatars/default_w.png'
+                : 'avatars/default.png';
+
+            return Storage::disk('s3')->url($default);
         }
 
         if (str_starts_with($this->image, 'http')) {
