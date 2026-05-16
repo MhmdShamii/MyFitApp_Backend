@@ -19,14 +19,15 @@ class FeedbackRecorderService
         float $protein,
         float $carbs,
         float $fats,
-        string $action = 'logged'
+        string $action = 'logged',
+        ?string $description = null,
+        ?string $ingredientsList = null,
     ): void {
         try {
             $hour     = now()->hour;
             $timeSlot = $this->getTimeSlot($hour);
 
-            $text = "{$mealTitle}. Calories: {$calories} kcal, Protein: {$protein}g, Carbs: {$carbs}g, Fats: {$fats}g";
-
+            $text         = $this->buildEmbeddingText($mealTitle, $calories, $protein, $carbs, $fats, $timeSlot, $description, $ingredientsList);
             $vector       = $this->embeddingService->generate($text);
             $embeddingStr = '[' . implode(',', $vector) . ']';
 
@@ -61,5 +62,34 @@ class FeedbackRecorderService
             $hour >= 18 && $hour <= 22 => 'dinner',
             default                    => 'late_night',
         };
+    }
+
+    private function buildEmbeddingText(
+        string $mealTitle,
+        float $calories,
+        float $protein,
+        float $carbs,
+        float $fats,
+        string $timeSlot,
+        ?string $description = null,
+        ?string $ingredientsList = null,
+    ): string {
+        $text = $mealTitle . '.';
+
+        if ($description) {
+            $text .= ' ' . $description . '.';
+        }
+
+        if ($ingredientsList) {
+            $text .= ' Ingredients: ' . $ingredientsList . '.';
+        }
+
+        $text .= " Calories: {$calories} kcal,";
+        $text .= " Protein: {$protein}g,";
+        $text .= " Carbs: {$carbs}g,";
+        $text .= " Fats: {$fats}g.";
+        $text .= " Meal time: {$timeSlot}.";
+
+        return $text;
     }
 }
