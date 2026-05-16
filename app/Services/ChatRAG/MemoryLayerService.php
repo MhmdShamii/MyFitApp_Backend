@@ -39,7 +39,7 @@ class MemoryLayerService
         PROMPT;
 
         $response = OpenAI::chat()->create([
-            'model' => env('OPENAI_MODEL_CLASSIFY'),
+            'model' => env('OPENAI_MODEL_CLASSIFY', 'gpt-4o-mini-2024-07-18'),
             'temperature' => 0,
             'max_completion_tokens' => 300,
             'messages' => [
