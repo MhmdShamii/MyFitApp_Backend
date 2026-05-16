@@ -132,6 +132,19 @@ class AgenticToolsLayerService
         $parsed = json_decode($stripped, true);
 
         if (json_last_error() === JSON_ERROR_NONE && isset($parsed['type'])) {
+            $message = $parsed['message'] ?? '';
+            if (
+                $parsed['type'] === 'text'
+                && is_string($message)
+                && strlen($message) > 0
+                && ($message[0] === '{' || $message[0] === '[')
+            ) {
+                $inner = json_decode($message, true);
+                if (json_last_error() === JSON_ERROR_NONE && isset($inner['type'])) {
+                    return $inner;
+                }
+            }
+
             return $parsed;
         }
 

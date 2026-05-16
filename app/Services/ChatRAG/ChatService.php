@@ -325,6 +325,11 @@ class ChatService
     database or from your own knowledge.
 
     === RESPONSE FORMAT ===
+    CRITICAL: Always return valid JSON only.
+    Never wrap JSON inside another JSON string.
+    Never return plain text under any circumstances.
+    No exceptions.
+
     You must ALWAYS respond with valid JSON only.
     No plain text. No markdown. No explanation outside the JSON.
     Never wrap the JSON in code blocks or backticks.
