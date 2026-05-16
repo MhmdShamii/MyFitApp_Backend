@@ -283,6 +283,60 @@ trait NutritionToolsTrait
         });
     }
 
+    private function updateDailyTargets(string $profileId, ?int $calories, ?int $protein, ?int $carbs, ?int $fat): array
+    {
+        return DB::transaction(function () use ($profileId, $calories, $protein, $carbs, $fat) {
+            $profile = UserProfile::findOrFail($profileId);
+
+            $updates = array_filter([
+                'daily_calorie_target' => $calories,
+                'daily_protein_g'      => $protein,
+                'daily_carbs_g'        => $carbs,
+                'daily_fat_g'          => $fat,
+            ], fn ($v) => $v !== null);
+
+            if (empty($updates)) {
+                return ['text' => 'No targets provided to update.', 'data' => null];
+            }
+
+            $profile->update($updates);
+            $profile->refresh();
+
+            $summary = DailySummary::where('user_id', $profile->user_id)
+                ->whereDate('date', today())
+                ->first();
+
+            if ($summary) {
+                $summaryUpdates = array_filter([
+                    'calories_target' => $calories,
+                    'protein_target'  => $protein,
+                    'carbs_target'    => $carbs,
+                    'fats_target'     => $fat,
+                ], fn ($v) => $v !== null);
+
+                $summary->update($summaryUpdates);
+            }
+
+            $text = <<<RESULT
+            Daily targets updated:
+            - Calories : {$profile->daily_calorie_target} kcal
+            - Protein  : {$profile->daily_protein_g}g
+            - Carbs    : {$profile->daily_carbs_g}g
+            - Fat      : {$profile->daily_fat_g}g
+            RESULT;
+
+            return [
+                'text' => $text,
+                'data' => [
+                    'calories' => (int) $profile->daily_calorie_target,
+                    'protein'  => (int) $profile->daily_protein_g,
+                    'carbs'    => (int) $profile->daily_carbs_g,
+                    'fat'      => (int) $profile->daily_fat_g,
+                ],
+            ];
+        });
+    }
+
     private function deleteLastLog(string $profileId): array
     {
         return DB::transaction(function () use ($profileId) {

@@ -71,7 +71,14 @@ class AgenticToolsLayerService
             'get_meal_details' => $this->getMealDetails($arguments['meal_post_id']),
             'search_meals' => $this->searchMeals($arguments['query'], $arguments['max_calories'] ?? null, $arguments['min_protein'] ?? null),
             'log_meal' => $this->logMeal($profileId, $arguments['name'], (float) $arguments['calories'], (float) $arguments['protein'], (float) $arguments['carbs'], (float) $arguments['fats'], (float) ($arguments['fiber'] ?? 0)),
-            'delete_last_log' => $this->deleteLastLog($profileId),
+            'delete_last_log'      => $this->deleteLastLog($profileId),
+            'update_daily_targets' => $this->updateDailyTargets(
+                $profileId,
+                isset($arguments['calories']) ? (int) $arguments['calories'] : null,
+                isset($arguments['protein'])  ? (int) $arguments['protein']  : null,
+                isset($arguments['carbs'])    ? (int) $arguments['carbs']    : null,
+                isset($arguments['fat'])      ? (int) $arguments['fat']      : null,
+            ),
             default => ['text' => "Unknown tool: {$toolName}", 'data' => null],
         };
 
@@ -96,6 +103,14 @@ class AgenticToolsLayerService
                     'calories_remaining' => $this->lastToolData['calories_remaining'],
                     'protein_remaining' => $this->lastToolData['protein_remaining'],
                 ],
+            ];
+        }
+
+        if ($this->lastToolCalled === 'update_daily_targets' && ! empty($this->lastToolData)) {
+            return [
+                'type'    => 'targets_updated',
+                'message' => 'Your daily targets have been updated.',
+                'targets' => $this->lastToolData,
             ];
         }
 
@@ -210,6 +225,23 @@ class AgenticToolsLayerService
                     'name' => 'delete_last_log',
                     'description' => 'Delete the most recently logged meal today. Only call when user explicitly asks to undo cancel or remove their last log.',
                     'parameters' => ['type' => 'object', 'properties' => new \stdClass, 'required' => []],
+                ],
+            ],
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'update_daily_targets',
+                    'description' => 'Update the user daily nutrition targets. Only call when the user explicitly asks to change set or update their calorie protein carb or fat targets. All parameters are optional — only pass the ones the user wants to change.',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'calories' => ['type' => 'integer', 'description' => 'New daily calorie target in kcal'],
+                            'protein'  => ['type' => 'integer', 'description' => 'New daily protein target in grams'],
+                            'carbs'    => ['type' => 'integer', 'description' => 'New daily carbohydrate target in grams'],
+                            'fat'      => ['type' => 'integer', 'description' => 'New daily fat target in grams'],
+                        ],
+                        'required' => [],
+                    ],
                 ],
             ],
         ];

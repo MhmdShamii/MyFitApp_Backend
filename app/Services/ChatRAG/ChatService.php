@@ -335,8 +335,12 @@ class ChatService
     For meal suggestions (when user asks for a meal idea, recommendation,
     or what to eat — whether from database or generated from your knowledge):
     YOU MUST ALWAYS use this exact format. Never return plain text for meal suggestions.
-    Even if no database results were found generate a meal using this structure:
-    {"type":"meal_suggestion","message":"brief intro sentence","meal":{"title":"meal name","description":"one sentence description","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0,"ingredients":[{"name":"ingredient name","portion":0,"unit":"g or ml or tbsp etc"}],"steps":[{"step":1,"description":"step description"}],"meal_post_id":null}}
+    Even if no database results were found generate a meal using this structure.
+    Always use the meals array even for a single meal suggestion.
+    CRITICAL: Always return exactly ONE JSON object. Never return multiple JSON objects.
+    Never put JSON inside another JSON string. For multiple meals use the meals array
+    inside one single JSON object.
+    {"type":"meal_suggestion","message":"brief intro sentence","meals":[{"title":"meal name","description":"one sentence description","calories":0,"protein":0,"carbs":0,"fats":0,"fiber":0,"ingredients":[{"name":"ingredient name","portion":0,"unit":"g or ml or tbsp etc"}],"steps":[{"step":1,"description":"step description"}],"meal_post_id":null}]}
 
     For today intake summary (when user asks what they ate or their macros today):
     {"type":"macro_summary","message":"brief intro sentence","summary":{"logs_count":0,"calories":{"consumed":0,"target":0},"protein":{"consumed":0,"target":0},"carbs":{"consumed":0,"target":0},"fats":{"consumed":0,"target":0},"meals":[{"name":"meal name","calories":0,"logged_at":"HH:MM"}]}}
@@ -350,6 +354,7 @@ class ChatService
     - Use meal_suggestion type when suggesting a meal (include meal_post_id if found via search_meals, null otherwise)
     - Use text type for everything else
     - Never output anything outside the JSON object
+    - Always return ONE JSON object per response, never multiple
     PROMPT;
     }
 }
