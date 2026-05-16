@@ -29,17 +29,22 @@ class UserProfile extends Model
     ];
 
     protected $casts = [
-        'date_of_birth'       => 'date',
-        'weight_kg'           => 'decimal:2',
-        'height_cm'           => 'decimal:2',
-        'gender'              => UserGender::class,
-        'activity_level'      => UserActivityLevels::class,
-        'goal'                => UserGoal::class,
+        'date_of_birth' => 'date',
+        'weight_kg' => 'decimal:2',
+        'height_cm' => 'decimal:2',
+        'gender' => UserGender::class,
+        'activity_level' => UserActivityLevels::class,
+        'goal' => UserGoal::class,
         'dietary_preferences' => UserDietaryPreferences::class,
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function memories()
+    {
+        return $this->hasMany(UserMemorie::class, 'profile_id');
     }
 }
