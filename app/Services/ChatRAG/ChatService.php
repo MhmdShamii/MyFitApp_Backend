@@ -6,7 +6,6 @@ use App\Models\ConversationMessages;
 use App\Models\Conversations;
 use App\Models\DailySummary;
 use App\Models\UserProfile;
-use App\Services\FeedbackEmbeddingService;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Support\Facades\DB;
 use OpenAI\Laravel\Facades\OpenAI;
@@ -20,23 +19,30 @@ class ChatService
     public function __construct(
         private readonly MemoryLayerService $memoryLayerService,
         private readonly AgenticToolsLayerService $agenticToolsLayer,
-        private readonly FeedbackEmbeddingService $feedbackEmbeddingService,
+        private readonly FeedbackRecorderService $feedbackRecorder,
     ) {}
 
     public function sendMessage(string $message, string $profileId): array
     {
-        $embedding = $this->feedbackEmbeddingService->generateEmbedding($message);
-        dd($embedding);
-        $userInfo = $this->getUserInfo($profileId);
+        // Steps 1–2: conversation + dismissal detection (outside transaction — involves OpenAI embedding calls)
+        $conversation = $this->findOrCreateConversation($profileId);
+        $this->detectAndRecordDismissal($message, $conversation, $profileId);
 
-        $result = DB::transaction(function () use ($message, $profileId, $userInfo) {
+        // Steps 3–12: core flow inside transaction
+        $structured = DB::transaction(function () use ($message, $profileId, $conversation) {
+            // 3
             $this->memoryLayerService->extractPrefrencesFromMessage($profileId, $message);
 
-            $conversation = $this->findOrCreateConversation($profileId);
+            // 4
+            $userInfo = $this->getUserInfo($profileId);
+
+            // 5
             $this->insertMessage($conversation->id, 'user', $message);
 
+            // 6
             $history = $this->buildHistory($conversation);
 
+            // 7 + 8
             $structured = $this->agenticToolsLayer->run(
                 [
                     ['role' => 'system', 'content' => $this->buildSystemPrompt($userInfo)],
@@ -45,22 +51,36 @@ class ChatService
                 $profileId,
             );
 
+            // 9
+            if ($structured['type'] === 'meal_suggestion' && ! empty($structured['meals'])) {
+                $conversation->update([
+                    'last_suggested_meals' => json_encode(
+                        array_map(fn ($m) => [
+                            'title'    => $m['title'],
+                            'calories' => $m['calories'],
+                            'protein'  => $m['protein'],
+                            'carbs'    => $m['carbs'],
+                            'fats'     => $m['fats'],
+                        ], $structured['meals'])
+                    ),
+                ]);
+            }
+
+            // 10 + 11
             $this->insertMessage($conversation->id, 'assistant', json_encode($structured));
             $conversation->update(['last_active_at' => now()]);
 
-            return [
-                'structured' => $structured,
-                'conversation' => $conversation,
-                'count' => ConversationMessages::where('conversation_id', $conversation->id)->count(),
-            ];
+            // 12
+            return $structured;
         });
 
-        // Summarization runs OUTSIDE transaction
-        if ($result['count'] % self::SUMMARIZE_EVERY === 0) {
-            $this->summarize($result['conversation']);
+        // 13: summarization outside transaction
+        $count = ConversationMessages::where('conversation_id', $conversation->id)->count();
+        if ($count % self::SUMMARIZE_EVERY === 0) {
+            $this->summarize($conversation);
         }
 
-        return $result['structured'];
+        return $structured;
     }
 
     public function getMessageHistory(string $profileId, int $perPage = 20): CursorPaginator
@@ -95,6 +115,8 @@ class ChatService
            ? implode(', ', array_map(fn ($p) => "{$p['key']} ({$p['value']})", $foodPreferences))
            : 'None reported';
 
+        $feedbackContext = $this->feedbackRecorder->getFeedbackContext($profileId, now()->hour);
+
         return [
             'age' => $age,
             'gender' => $profile->gender?->value,
@@ -114,6 +136,7 @@ class ChatService
             ],
             'health_conditions' => $healthConditions,
             'daily_summary' => $this->getDailySummary($profile),
+            'feedback_context' => $feedbackContext,
         ];
     }
 
@@ -226,11 +249,76 @@ class ChatService
         ]);
     }
 
+    private function detectAndRecordDismissal(
+        string $message,
+        Conversations $conversation,
+        string $profileId
+    ): void {
+        $keywords = [
+            'suggest something else',
+            'give me another',
+            'something different',
+            "don't like that",
+            'no thanks',
+            'another option',
+            'change that',
+            'different meal',
+            'something else',
+            'not that',
+            'try again',
+            'other options',
+        ];
+
+        $lower = strtolower($message);
+
+        $matched = false;
+        foreach ($keywords as $keyword) {
+            if (str_contains($lower, $keyword)) {
+                $matched = true;
+                break;
+            }
+        }
+
+        if (! $matched) {
+            return;
+        }
+
+        $raw = $conversation->last_suggested_meals;
+        if ($raw === null) {
+            return;
+        }
+
+        $meals = json_decode($raw, true);
+        if (! is_array($meals) || empty($meals)) {
+            return;
+        }
+
+        foreach ($meals as $meal) {
+            try {
+                $this->feedbackRecorder->record(
+                    profileId: $profileId,
+                    mealTitle: $meal['title'],
+                    mealPostId: null,
+                    sourceType: 'bot_suggestion',
+                    calories: (float) $meal['calories'],
+                    protein: (float) $meal['protein'],
+                    carbs: (float) $meal['carbs'],
+                    fats: (float) $meal['fats'],
+                    action: 'dismissed',
+                );
+            } catch (\Throwable $e) {
+                \Log::error('Dismissal feedback recording failed: ' . $e->getMessage());
+            }
+        }
+    }
+
     private function buildSystemPrompt(array $userInfo): string
     {
         $conditions = ! empty($userInfo['health_conditions'])
             ? implode(', ', $userInfo['health_conditions'])
             : 'None reported';
+
+        $feedbackContext = $userInfo['feedback_context'];
 
         $targets = $userInfo['targets'];
         $summary = $userInfo['daily_summary'];
@@ -335,6 +423,15 @@ class ChatService
     Never return meal suggestions as plain text.
     This applies whether the meal comes from the
     database or from your own knowledge.
+
+    === RECOMMENDATION CONTEXT ===
+    {$feedbackContext}
+
+    When suggesting meals:
+    - Prioritize meals similar to ones user frequently logs
+    - Never suggest meals in the never suggest list
+    - Consider the current time slot for appropriateness
+    - Learn from logged meal patterns to understand preferences
 
     === RESPONSE FORMAT ===
     CRITICAL: Always return valid JSON only.

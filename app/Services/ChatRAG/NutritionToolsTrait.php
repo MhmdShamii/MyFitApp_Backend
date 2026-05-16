@@ -4,9 +4,12 @@ namespace App\Services\ChatRAG;
 
 use App\Enums\DailyLogType;
 use App\Enums\MealVisibility;
+use App\Models\Conversations;
 use App\Models\DailyLog;
 use App\Models\DailySummary;
 use App\Models\MealPost;
+use App\Models\RecommendationFeedback;
+use App\Models\UserMemory;
 use App\Models\UserProfile;
 use Illuminate\Support\Facades\DB;
 
@@ -296,6 +299,57 @@ trait NutritionToolsTrait
             );
         } catch (\Throwable $e) {
             \Log::error('Feedback recording failed after logMeal: ' . $e->getMessage());
+        }
+
+        try {
+            $conversation = Conversations::where('profile_id', $profileId)->first();
+
+            if ($conversation && $conversation->last_suggested_meals !== null) {
+                $lastMeals = json_decode($conversation->last_suggested_meals, true);
+
+                if (is_array($lastMeals) && ! empty($lastMeals)) {
+                    foreach ($lastMeals as $meal) {
+                        if (strtolower($meal['title']) === strtolower($name)) {
+                            continue;
+                        }
+
+                        $existing = RecommendationFeedback::where('profile_id', $profileId)
+                            ->where('meal_title', $meal['title'])
+                            ->where('action', 'not_chosen')
+                            ->first();
+
+                        if ($existing) {
+                            $existing->increment('shown_count');
+                            $totalShown = $existing->shown_count + 1;
+                        } else {
+                            RecommendationFeedback::create([
+                                'profile_id'     => $profileId,
+                                'meal_title'     => $meal['title'],
+                                'meal_post_id'   => null,
+                                'source_type'    => 'bot_suggestion',
+                                'action'         => 'not_chosen',
+                                'meal_time_slot' => $this->feedbackRecorder->getTimeSlot(now()->hour),
+                                'logged_hour'    => now()->hour,
+                                'calories'       => $meal['calories'],
+                                'protein'        => $meal['protein'],
+                                'carbs'          => $meal['carbs'],
+                                'fats'           => $meal['fats'],
+                                'shown_count'    => 1,
+                            ]);
+                            $totalShown = 1;
+                        }
+
+                        if ($totalShown >= 3) {
+                            UserMemory::updateOrCreate(
+                                ['profile_id' => $profileId, 'key' => strtolower($meal['title'])],
+                                ['value' => 'implicitly dislikes'],
+                            );
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::error('Not-chosen feedback recording failed after logMeal: ' . $e->getMessage());
         }
 
         return $result;

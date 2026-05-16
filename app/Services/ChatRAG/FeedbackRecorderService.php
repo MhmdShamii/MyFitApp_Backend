@@ -81,8 +81,7 @@ class FeedbackRecorderService
             ->where('profile_id', $profileId)
             ->where('action', 'not_chosen')
             ->where('meal_time_slot', $timeSlot)
-            ->groupBy('meal_title')
-            ->havingRaw('count(*) >= 3')
+            ->where('shown_count', '>=', 3)
             ->pluck('meal_title');
 
         $blacklist = $dismissed->merge($notChosen)->unique()->values();
