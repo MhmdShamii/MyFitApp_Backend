@@ -220,7 +220,7 @@ trait NutritionToolsTrait
 
     private function logMeal(string $profileId, string $name, float $calories, float $protein, float $carbs, float $fats, float $fiber = 0): array
     {
-        return DB::transaction(function () use ($profileId, $name, $calories, $protein, $carbs, $fats, $fiber) {
+        $result = DB::transaction(function () use ($profileId, $name, $calories, $protein, $carbs, $fats, $fiber) {
             $profile = UserProfile::findOrFail($profileId);
 
             $summary = DailySummary::firstOrCreate(
@@ -281,6 +281,24 @@ trait NutritionToolsTrait
                 ],
             ];
         });
+
+        try {
+            $this->feedbackRecorder->record(
+                profileId: $profileId,
+                mealTitle: $name,
+                mealPostId: null,
+                sourceType: 'bot_suggestion',
+                calories: $calories,
+                protein: $protein,
+                carbs: $carbs,
+                fats: $fats,
+                action: 'logged',
+            );
+        } catch (\Throwable $e) {
+            \Log::error('Feedback recording failed after logMeal: ' . $e->getMessage());
+        }
+
+        return $result;
     }
 
     private function updateDailyTargets(string $profileId, ?int $calories, ?int $protein, ?int $carbs, ?int $fat): array
