@@ -29,6 +29,15 @@ class MealQueryService
             ->cursorPaginate($perPage);
     }
 
+    public function getSavedMeals(User $user, int $perPage = 12): CursorPaginator
+    {
+        return MealPost::with(['mealMacro', 'saves' => fn($q) => $q->where('user_id', $user->id)])
+            ->whereHas('saves', fn($q) => $q->where('user_id', $user->id))
+            ->whereNotNull('confirmed_at')
+            ->orderByDesc('confirmed_at')
+            ->cursorPaginate($perPage);
+    }
+
     public function getById(int $id, User $viewer): MealPost
     {
         $meal = MealPost::with(['ingredients', 'mealMacro', 'preparationSteps', 'userProfile.user'])

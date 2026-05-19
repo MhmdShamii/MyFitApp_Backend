@@ -83,6 +83,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsToMany(User::class, 'user_follows', 'followed_id', 'follower_id');
     }
 
+    public function savedMeals()
+    {
+        return $this->belongsToMany(MealPost::class, 'meal_post_saves');
+    }
+
     // Query scopes
 
     public function scopeFindByEmail($query, string $email)

@@ -14,6 +14,7 @@ use App\Http\Controllers\Social\CommentController;
 use App\Http\Controllers\Social\FeedController;
 use App\Http\Controllers\Social\FollowController;
 use App\Http\Controllers\Social\LikeController;
+use App\Http\Controllers\Social\SaveController;
 use App\Http\Controllers\Coach\CoachApplicationController;
 use App\Http\Controllers\User\UserMealController;
 use App\Http\Controllers\chatAiController;
@@ -47,6 +48,7 @@ Route::prefix('v1')->group(function () {
 
         Route::prefix('users/me')->group(function () {
             Route::get('/', [UserController::class, 'show']);
+            Route::get('/saved-meals', [SaveController::class, 'index']);
             Route::patch('/', [UserController::class, 'update']);
             Route::post('/complete-main-info', [UserController::class, 'storeMainInfo'])->middleware('ensure.step:main_info');
             Route::post('/complete-basic-info', [UserProfileController::class, 'storeBasicInfo'])->middleware('ensure.step:basic_info');
@@ -98,6 +100,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/{meal}/discard', [MealController::class, 'discard'])->middleware('ensure.owns:meal,user_profile_id');
             Route::post('/{meal}/like', [LikeController::class, 'like']);
             Route::delete('/{meal}/like', [LikeController::class, 'unlike']);
+            Route::post('/{meal}/save', [SaveController::class, 'save']);
+            Route::delete('/{meal}/save', [SaveController::class, 'unsave']);
             Route::get('/{meal}/comments', [CommentController::class, 'index']);
             Route::post('/{meal}/comments', [CommentController::class, 'store']);
             Route::get('/{meal}/comments/{comment}/replies', [CommentController::class, 'replies']);

@@ -25,7 +25,8 @@ class MealCardResource extends JsonResource
                 'likes_count'    => $this->likes_count,
                 'relogs_count'   => $this->relogs_count,
                 'comments_count' => $this->comments_count,
-                'is_liked'       => $this->likes->isNotEmpty(),
+                'is_liked'       => $this->relationLoaded('likes') && $this->likes->isNotEmpty(),
+                'is_saved'       => $this->relationLoaded('saves') && $this->saves->isNotEmpty(),
             ],
         ];
     }
