@@ -11,7 +11,11 @@ class MealQueryService
 {
     public function getUserPublicMeals(User $owner, User $viewer, int $perPage = 12): CursorPaginator
     {
-        return MealPost::with(['mealMacro', 'likes' => fn($q) => $q->where('user_id', $viewer->id)])
+        return MealPost::with([
+                'mealMacro',
+                'likes' => fn($q) => $q->where('user_id', $viewer->id),
+                'saves' => fn($q) => $q->where('user_id', $viewer->id),
+            ])
             ->whereHas('userProfile', fn($q) => $q->where('user_id', $owner->id))
             ->whereNotNull('confirmed_at')
             ->where('visibility', MealVisibility::PUBLIC)
@@ -21,7 +25,11 @@ class MealQueryService
 
     public function getUserPrivateMeals(User $owner, int $perPage = 12): CursorPaginator
     {
-        return MealPost::with(['mealMacro', 'likes' => fn($q) => $q->where('user_id', $owner->id)])
+        return MealPost::with([
+                'mealMacro',
+                'likes' => fn($q) => $q->where('user_id', $owner->id),
+                'saves' => fn($q) => $q->where('user_id', $owner->id),
+            ])
             ->whereHas('userProfile', fn($q) => $q->where('user_id', $owner->id))
             ->whereNotNull('confirmed_at')
             ->where('visibility', MealVisibility::PRIVATE)
@@ -31,7 +39,11 @@ class MealQueryService
 
     public function getSavedMeals(User $user, int $perPage = 12): CursorPaginator
     {
-        return MealPost::with(['mealMacro', 'saves' => fn($q) => $q->where('user_id', $user->id)])
+        return MealPost::with([
+                'mealMacro',
+                'likes' => fn($q) => $q->where('user_id', $user->id),
+                'saves' => fn($q) => $q->where('user_id', $user->id),
+            ])
             ->whereHas('saves', fn($q) => $q->where('user_id', $user->id))
             ->whereNotNull('confirmed_at')
             ->orderByDesc('confirmed_at')

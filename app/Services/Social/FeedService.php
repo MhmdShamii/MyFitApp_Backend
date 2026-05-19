@@ -19,6 +19,7 @@ class FeedService
                 'preparationSteps',
                 'userProfile.user',
                 ...($viewer ? ['likes' => fn($q) => $q->where('user_id', $viewer->id)] : []),
+                ...($viewer ? ['saves' => fn($q) => $q->where('user_id', $viewer->id)] : []),
             ])
             ->whereNotNull('confirmed_at')
             ->where('visibility', MealVisibility::PUBLIC);
@@ -46,6 +47,7 @@ class FeedService
                 'preparationSteps',
                 'userProfile.user',
                 'likes' => fn($q) => $q->where('user_id', $viewer->id),
+                'saves' => fn($q) => $q->where('user_id', $viewer->id),
             ])
             ->whereNotNull('confirmed_at')
             ->where('visibility', MealVisibility::PUBLIC)

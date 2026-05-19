@@ -47,9 +47,8 @@ class MealPostDetailResource extends JsonResource
                 'likes_count'    => $this->likes_count,
                 'relogs_count'   => $this->relogs_count,
                 'comments_count' => $this->comments_count,
-                'is_liked'       => $authUser
-                    ? $this->likes()->where('user_id', $authUser->id)->exists()
-                    : false,
+                'is_liked'       => $authUser ? $this->likes()->where('user_id', $authUser->id)->exists() : false,
+                'is_saved'       => $authUser ? $this->saves()->where('user_id', $authUser->id)->exists() : false,
             ],
 
             'author' => [
